@@ -35,6 +35,9 @@ npm run dev
 
 # everything in Docker (production-like): only the gateway is exposed on 127.0.0.1:3000
 docker compose --profile app up -d --build
+
+# same, but code changes sync and restart containers automatically (no manual rebuild)
+docker compose --profile app watch
 ```
 
 Docker-mode logs: `docker compose --profile app logs -f [service]`.

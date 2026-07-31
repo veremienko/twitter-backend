@@ -105,6 +105,16 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./services/api-gateway/src
+          target: /app/services/api-gateway/src
+        - action: sync+restart
+          path: ./packages/shared/src
+          target: /app/packages/shared/src
+        - action: rebuild
+          path: ./services/api-gateway/package.json
 
   health:
     build:
@@ -125,6 +135,16 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./services/health/src
+          target: /app/services/health/src
+        - action: sync+restart
+          path: ./packages/shared/src
+          target: /app/packages/shared/src
+        - action: rebuild
+          path: ./services/health/package.json
 
   twit-service:
     build:
@@ -146,6 +166,16 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./services/twit-service/src
+          target: /app/services/twit-service/src
+        - action: sync+restart
+          path: ./packages/shared/src
+          target: /app/packages/shared/src
+        - action: rebuild
+          path: ./services/twit-service/package.json
 
   auth-service:
     build:
@@ -164,6 +194,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./services/auth-service/src
+          target: /app/services/auth-service/src
+        - action: sync+restart
+          path: ./packages/shared/src
+          target: /app/packages/shared/src
+        - action: rebuild
+          path: ./services/auth-service/package.json
 
   notification-service:
     build:
@@ -177,6 +217,16 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./services/notification-service/src
+          target: /app/services/notification-service/src
+        - action: sync+restart
+          path: ./packages/shared/src
+          target: /app/packages/shared/src
+        - action: rebuild
+          path: ./services/notification-service/package.json
 
 volumes:
   postgres_data:
