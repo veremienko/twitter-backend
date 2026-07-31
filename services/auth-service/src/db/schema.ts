@@ -6,14 +6,4 @@ export const users = pgTable('users', {
     passwordHash: varchar('passwordHash', { length: 255 }).notNull(),
 });
 
-export type LoginRequest = {
-    email: string;
-    password: string;
-};
-
-export type RegisterRequest = {
-    email: string;
-    password: string;
-};
-
 export type User = typeof users.$inferSelect;

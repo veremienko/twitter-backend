@@ -1,11 +1,13 @@
 import { type RedisClient} from "@twitter/shared";
 import {db} from "../db/client.ts";
-import {type LoginRequest, type RegisterRequest, users} from "../db/schema.ts";
+import {users} from "../db/schema.ts";
 import {eq} from "drizzle-orm";
 import bcrypt from "bcrypt";
 import {HttpError} from "../http-error.ts";
 
 const SESSION_TTL_SECONDS = 7 * 24 * 3600;
+const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
+const MIN_PASSWORD_LENGTH = 8;
 
 export class AuthService {
     redis:RedisClient;
@@ -14,8 +16,11 @@ export class AuthService {
         this.redis = redis;
     }
 
-    async register(data: RegisterRequest) {
-        const { email, password } = data;
+    async register(data: unknown) {
+        const { email, password } = validateCredentials(data);
+        if (password.length < MIN_PASSWORD_LENGTH) {
+            throw new HttpError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+        }
         const normalizedEmail = email.trim().toLowerCase();
         const hash = await bcrypt.hash(password, 12);
         try {
@@ -29,8 +34,8 @@ export class AuthService {
         return { message: 'User registered successfully' };
     }
 
-    async login(data: LoginRequest) {
-        const { email, password } = data;
+    async login(data: unknown) {
+        const { email, password } = validateCredentials(data);
         const normalizedEmail = email.trim().toLowerCase();
         const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
         if (!user) {
@@ -48,6 +53,17 @@ export class AuthService {
     async logout(sid: string) {
         await this.redis.del(`session:${sid}`);
     }
+}
+
+function validateCredentials(body: unknown): { email: string; password: string } {
+    const { email, password } = (body ?? {}) as Record<string, unknown>;
+    if (typeof email !== 'string' || !EMAIL_PATTERN.test(email.trim())) {
+        throw new HttpError(400, 'Valid email is required');
+    }
+    if (typeof password !== 'string' || password.length === 0) {
+        throw new HttpError(400, 'Password is required');
+    }
+    return { email, password };
 }
 
 /** Detect a Postgres unique-constraint violation (code 23505), possibly wrapped by drizzle. */
