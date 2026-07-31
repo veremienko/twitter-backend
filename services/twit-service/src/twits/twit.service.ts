@@ -16,17 +16,21 @@ export class TwitService {
         this.producer = producer;
     }
 
-    /** Insert a twit, invalidate the cache and publish twit.created to Kafka. */
+    /** Insert a twit, invalidate the cache and publish twit.created to Kafka (best effort). */
     async createTwit(data: NewTwit & { email: string }): Promise<Twit> {
         const [twit] = await db.insert(twits).values({
             author: data.email,
             text: data.text,
         }).returning();
         await this.redis.del(CACHE_KEY);
-        await this.producer.send({
-            topic: TOPICS.TWIT_CREATED,
-            messages: [{ value: JSON.stringify(twit) }],
-        });
+        try {
+            await this.producer.send({
+                topic: TOPICS.TWIT_CREATED,
+                messages: [{ value: JSON.stringify(twit) }],
+            });
+        } catch (error) {
+            console.error('Failed to publish twit.created event:', error);
+        }
         return twit!;
     }
 

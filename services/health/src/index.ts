@@ -23,7 +23,7 @@ async function main() {
         res.status(healthy ? 200 : 503).json(status);
     });
 
-    const port = process.env.HEALTH_SERVICE_PORT ?? 3002;
+    const port = process.env.HEALTH_SERVICE_PORT ?? 3001;
     app.listen(port, () => {
         console.log(`health started on port ${port}`);
     });

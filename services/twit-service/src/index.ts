@@ -14,7 +14,7 @@ async function main() {
     const twitService = new TwitService(redis, producer);
     app.use(twitRouter(twitService));
 
-    const port = process.env.TWIT_SERVICE_PORT ?? 3001;
+    const port = process.env.TWIT_SERVICE_PORT ?? 3002;
     app.listen(port, () => {
         console.log(`twit-service started on port ${port}`);
     });
