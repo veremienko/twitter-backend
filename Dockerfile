@@ -4,6 +4,7 @@ FROM node:25-alpine
 
 ARG SERVICE
 ENV SERVICE=${SERVICE}
+ENV NODE_ENV=production
 
 WORKDIR /app
 
@@ -14,5 +15,7 @@ COPY services/${SERVICE}/package.json services/${SERVICE}/package.json
 RUN npm ci -w services/${SERVICE} --omit=dev
 
 COPY services/${SERVICE} services/${SERVICE}
+
+USER node
 
 CMD ["sh", "-c", "node services/$SERVICE/src/index.ts"]

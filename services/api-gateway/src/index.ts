@@ -38,7 +38,8 @@ async function forward(res: Response, url: string, init?: RequestInit) {
         }
         res.status(response.status).json(await response.json());
     } catch (error) {
-        res.status(502).json({ error: (error as Error).message });
+        console.error(error);
+        res.status(502).json({ error: 'Bad gateway' });
     }
 }
 

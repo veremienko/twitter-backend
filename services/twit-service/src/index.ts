@@ -1,5 +1,5 @@
 import express from 'express';
-import { createKafka, createRedis } from '@twitter/shared';
+import { createKafka, createRedis, internalAuth } from '@twitter/shared';
 import { TwitService } from './twits/twit.service.ts';
 import { twitRouter } from './twits/twit.controller.ts';
 
@@ -14,12 +14,7 @@ async function main() {
     const app = express();
     app.use(express.json());
 
-    app.use((req, res, next) => {
-        if (req.headers['x-internal-token'] !== INTERNAL_TOKEN) {
-            return res.status(401).json({ error: 'unauthorized' });
-        }
-        next();
-    });
+    app.use(internalAuth(INTERNAL_TOKEN!));
 
     const twitService = new TwitService(redis, producer);
     app.use(twitRouter(twitService));

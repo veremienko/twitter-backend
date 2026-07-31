@@ -1,11 +1,12 @@
 import { desc } from 'drizzle-orm';
-import { TOPICS, type Producer, type RedisClient } from '@twitter/shared';
+import { HttpError, TOPICS, type Producer, type RedisClient } from '@twitter/shared';
 import { db } from '../db/client.ts';
-import { twits, type NewTwit, type Twit } from '../db/schema.ts';
-import {eq} from "drizzle-orm";
+import { twits, type Twit } from '../db/schema.ts';
 
 const CACHE_KEY = 'twits:all';
 const CACHE_TTL_SECONDS = 30;
+const MAX_TEXT_LENGTH = 280;
+const MAX_AUTHOR_LENGTH = 64;
 
 export class TwitService {
     redis: RedisClient;
@@ -17,10 +18,11 @@ export class TwitService {
     }
 
     /** Insert a twit, invalidate the cache and publish twit.created to Kafka (best effort). */
-    async createTwit(data: NewTwit & { email: string }): Promise<Twit> {
+    async createTwit(data: { text: unknown; email: unknown }): Promise<Twit> {
+        const { text, email } = validateTwit(data);
         const [twit] = await db.insert(twits).values({
-            author: data.email,
-            text: data.text,
+            author: email,
+            text,
         }).returning();
         await this.redis.del(CACHE_KEY);
         try {
@@ -43,4 +45,15 @@ export class TwitService {
         await this.redis.set(CACHE_KEY, JSON.stringify(result), { EX: CACHE_TTL_SECONDS });
         return result;
     }
+}
+
+function validateTwit(data: { text: unknown; email: unknown }): { text: string; email: string } {
+    const { text, email } = data;
+    if (typeof email !== 'string' || email.length === 0 || email.length > MAX_AUTHOR_LENGTH) {
+        throw new HttpError(400, 'x-user-email header is required');
+    }
+    if (typeof text !== 'string' || text.trim().length === 0 || text.length > MAX_TEXT_LENGTH) {
+        throw new HttpError(400, `text must be a non-empty string up to ${MAX_TEXT_LENGTH} characters`);
+    }
+    return { text, email };
 }

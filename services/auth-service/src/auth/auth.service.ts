@@ -1,9 +1,8 @@
-import { type RedisClient} from "@twitter/shared";
+import {HttpError, type RedisClient} from "@twitter/shared";
 import {db} from "../db/client.ts";
 import {users} from "../db/schema.ts";
 import {eq} from "drizzle-orm";
 import bcrypt from "bcrypt";
-import {HttpError} from "../http-error.ts";
 
 const SESSION_TTL_SECONDS = 7 * 24 * 3600;
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;

@@ -1,4 +1,4 @@
-import {createRedis} from "@twitter/shared";
+import {createRedis, internalAuth} from "@twitter/shared";
 import express from "express";
 import {AuthService} from "./auth/auth.service.ts";
 import {authController as authRouter} from "./auth/auth.controller.ts";
@@ -14,12 +14,7 @@ const main = async ()=>{
 
     app.use(express.json());
 
-    app.use((req, res, next) => {
-        if (req.headers['x-internal-token'] !== INTERNAL_TOKEN) {
-            return res.status(401).json({ error: 'unauthorized' });
-        }
-        next();
-    });
+    app.use(internalAuth(INTERNAL_TOKEN));
 
     const authService = new AuthService(redis);
 

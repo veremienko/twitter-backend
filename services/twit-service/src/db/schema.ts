@@ -8,7 +8,3 @@ export const twits = pgTable('twits', {
 });
 
 export type Twit = typeof twits.$inferSelect;
-
-export type NewTwit = {
-    text: string;
-};

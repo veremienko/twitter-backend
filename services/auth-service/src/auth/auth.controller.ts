@@ -1,16 +1,6 @@
-import { Router, type Response } from 'express';
+import { Router } from 'express';
+import {sendError} from "@twitter/shared";
 import type {AuthService} from "./auth.service.ts";
-import {HttpError} from "../http-error.ts";
-
-/** Send HttpError as-is; log anything else and reply with a generic 500. */
-function sendError(res: Response, error: unknown) {
-    if (error instanceof HttpError) {
-        res.status(error.status).json({ error: error.message });
-        return;
-    }
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
-}
 
 export function authController(authService: AuthService): Router {
     const router = Router();
