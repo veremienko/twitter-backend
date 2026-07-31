@@ -1,0 +1,25 @@
+{
+  "name": "twitter-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n gateway,health,auth,twit,notif -c blue,green,red,white,yellow npm:dev:gateway npm:dev:health npm:dev:auth npm:dev:twit npm:dev:notif",
+    "dev:gateway": "npm run dev -w services/api-gateway",
+    "dev:health": "npm run dev -w services/health",
+    "dev:auth": "npm run dev -w services/auth-service",
+    "dev:twit": "npm run dev -w services/twit-service",
+    "dev:notif": "npm run dev -w services/notification-service",
+    "db:generate": "npm run db:generate --workspaces --if-present",
+    "db:migrate": "npm run db:migrate --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.10",
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  }
+}

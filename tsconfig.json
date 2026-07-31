@@ -1,0 +1,29 @@
+{
+  // TypeScript тут працює лише як перевірка типів (npx tsc --noEmit) і підказки в IDE.
+  // Виконує код сам Node 25: він "зрізає" типи з .ts на льоту (type stripping),
+  // тому збірки немає, а конфіг налаштований під обмеження цього режиму.
+  "compilerOptions": {
+    // Який синтаксис JS вважати цільовим. Транспіляції немає, Node 25 розуміє все — тому найновіший.
+    "target": "esnext",
+    // Система модулів "як у Node": ESM + exports у package.json (так резолвиться @twitter/shared).
+    "module": "nodenext",
+    // Шукати імпорти за правилами Node (node_modules, симлінки workspaces, поле exports).
+    "moduleResolution": "nodenext",
+    // Всі строгі перевірки типів разом (null-safety, неявні any і т.д.).
+    "strict": true,
+    // Не генерувати .js-файли — tsc тільки перевіряє, запускаємо ми .ts напряму.
+    "noEmit": true,
+    // Дозволити писати розширення в імпортах: import ... from './db/client.ts' —
+    // саме такі шляхи вимагає нативний запуск TS у Node.
+    "allowImportingTsExtensions": true,
+    // Заборонити TS-синтаксис, який не можна просто "стерти" (enum, namespace,
+    // параметри-властивості конструктора) — Node такий код виконати не зможе.
+    "erasableSyntaxOnly": true,
+    // Імпорти типів мусять бути явними: import type { X } — щоб після зрізання типів
+    // не лишалося зайвих runtime-імпортів.
+    "verbatimModuleSyntax": true,
+    // Не перевіряти типи всередині node_modules (*.d.ts) — швидше, і чужі помилки не наші.
+    "skipLibCheck": true
+  },
+  "include": ["packages/*/src", "services/*/src", "services/*/drizzle.config.ts"]
+}
