@@ -77,5 +77,5 @@ services/twit-service/
   └── src/db/schema.ts    database schema (source of truth)
 Dockerfile                one for all services: --build-arg SERVICE=<name>
 docker-compose.yml        infrastructure + app profile for the services
-.env                      variables for host processes (containers do not read it)
+.env                      variables for host processes and docker-compose interpolation
 ```

@@ -5,13 +5,13 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_USER: twitter
-      POSTGRES_PASSWORD: twitter
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: twitter
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U twitter -d twitter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d twitter"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -61,8 +61,8 @@ services:
     ports:
       - "127.0.0.1:8082:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
@@ -98,6 +98,7 @@ services:
     environment:
       GATEWAY_PORT: 3000
       REDIS_URL: redis://redis:6379
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
       HEALTH_SERVICE_URL: http://health:3001
       TWIT_SERVICE_URL: http://twit-service:3002
       AUTH_SERVICE_URL: http://auth-service:3003
@@ -114,7 +115,7 @@ services:
     profiles: [app]
     environment:
       HEALTH_SERVICE_PORT: 3001
-      DATABASE_URL: postgres://twitter:twitter@postgres:5432/twitter
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twitter
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:29092
     depends_on:
@@ -134,7 +135,8 @@ services:
     profiles: [app]
     environment:
       TWIT_SERVICE_PORT: 3002
-      DATABASE_URL: postgres://twitter:twitter@postgres:5432/twitter
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twitter
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:29092
     depends_on:
@@ -154,7 +156,8 @@ services:
     profiles: [app]
     environment:
       AUTH_SERVICE_PORT: 3003
-      DATABASE_URL: postgres://twitter:twitter@postgres:5432/twitter
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twitter
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
       REDIS_URL: redis://redis:6379
     depends_on:
       postgres:

@@ -6,6 +6,9 @@ const HEALTH_SERVICE_URL = process.env.HEALTH_SERVICE_URL ?? 'http://localhost:3
 const TWIT_SERVICE_URL = process.env.TWIT_SERVICE_URL ?? 'http://localhost:3002';
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3003';
 
+const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN;
+if (!INTERNAL_TOKEN) throw new Error('INTERNAL_TOKEN env var is required');
+
 const app = express();
 
 app.use(express.json());
@@ -26,7 +29,10 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
 /** Forward a request to a downstream service and mirror its response. */
 async function forward(res: Response, url: string, init?: RequestInit) {
     try {
-        const response = await fetch(url, init);
+        const response = await fetch(url, {
+            ...init,
+            headers: { 'x-internal-token': INTERNAL_TOKEN!, ...init?.headers },
+        });
         for (const cookie of response.headers.getSetCookie()) {
             res.append('set-cookie', cookie);
         }
