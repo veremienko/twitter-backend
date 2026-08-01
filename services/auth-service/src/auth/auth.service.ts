@@ -29,30 +29,32 @@ export class AuthService {
     async register(data: unknown) {
         const { email, password, name, age, sex } = parseBody(RegistrationSchema, data);
         const passwordHash = await bcrypt.hash(password, 12);
-        try {
-            await fetch(`${USER_SERVICE_URL}/users`, {
-                headers: { 'x-internal-token': INTERNAL_TOKEN },
-                method: 'POST',
-                body: JSON.stringify({ email, passwordHash, name, age, sex })
-            });
-        } catch (error) {
-            if (isUniqueViolation(error)) {
-                throw new HttpError(409, 'Email already exists');
-            }
-            throw error;
+        const response = await fetch(`${USER_SERVICE_URL}/users`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'x-internal-token': INTERNAL_TOKEN },
+            body: JSON.stringify({ email, passwordHash, name, age, sex }),
+        });
+        if (response.status === 409) {
+            throw new HttpError(409, 'Email already exists');
+        }
+        if (!response.ok) {
+            throw new Error(`user-service POST /users responded with ${response.status}`);
         }
         return { message: 'User registered successfully' };
     }
 
     async login(data: unknown) {
         const { email, password } = parseBody(CredentialsSchema, data);
-        const response = await fetch(`${USER_SERVICE_URL}/users?emails[]=${email}`, {
+        const response = await fetch(`${USER_SERVICE_URL}/users/by-email?email=${encodeURIComponent(email)}`, {
             headers: { 'x-internal-token': INTERNAL_TOKEN },
         });
-        const [user]: { id: number; passwordHash: string }[] = await response.json();
-        if (!user) {
+        if (response.status === 404) {
             throw new HttpError(401, 'Invalid email or password');
         }
+        if (!response.ok) {
+            throw new Error(`user-service GET /users/by-email responded with ${response.status}`);
+        }
+        const user: { id: number; passwordHash: string } = await response.json();
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
         if (!isPasswordValid) {
             throw new HttpError(401, 'Invalid email or password');
@@ -65,11 +67,4 @@ export class AuthService {
     async logout(sid: string) {
         await this.redis.del(`session:${sid}`);
     }
-}
-
-/** Detect a Postgres unique-constraint violation (code 23505), possibly wrapped by drizzle. */
-function isUniqueViolation(error: unknown): boolean {
-    if (!(error instanceof Error)) return false;
-    const code = (error as { code?: string }).code ?? (error.cause as { code?: string } | undefined)?.code;
-    return code === '23505';
 }

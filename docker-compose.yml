@@ -157,7 +157,7 @@ services:
       TWIT_SERVICE_PORT: 3002
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twitter
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
-      AUTH_SERVICE_URL: http://auth-service:3003
+      USER_SERVICE_URL: http://user-service:3004
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:29092
     depends_on:
@@ -187,14 +187,14 @@ services:
     profiles: [app]
     environment:
       AUTH_SERVICE_PORT: 3003
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twitter
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      USER_SERVICE_URL: http://user-service:3004
       REDIS_URL: redis://redis:6379
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
+      user-service:
+        condition: service_started
     develop:
       watch:
         - action: sync+restart
@@ -217,15 +217,8 @@ services:
       USER_SERVICE_PORT: 3004
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twitter
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
-      AUTH_SERVICE_URL: http://auth-service:3003
-      REDIS_URL: redis://redis:6379
-      KAFKA_BROKERS: kafka:29092
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
         condition: service_healthy
     develop:
       watch:

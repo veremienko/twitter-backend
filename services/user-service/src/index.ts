@@ -16,7 +16,7 @@ const main = async () => {
     const usersService = new UsersService();
     app.use('/', usersRouter(usersService));
 
-    const port = process.env.USER_SERVICE_PORT ?? 3003;
+    const port = process.env.USER_SERVICE_PORT ?? 3004;
     app.listen(port, () => {
         console.log(`user-service started on port ${port}`);
     });

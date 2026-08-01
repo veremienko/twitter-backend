@@ -7,7 +7,23 @@ export function usersController(usersService: UsersService): Router {
 
     router.get('/users', async (req, res) => {
         try {
-            res.status(200).json(await usersService.getUsers(req));
+            res.status(200).json(await usersService.getUsersByIds(req.query.ids));
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
+    router.get('/users/by-email', async (req, res) => {
+        try {
+            res.status(200).json(await usersService.getUserByEmail(req.query.email));
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
+    router.post('/users', async (req, res) => {
+        try {
+            res.status(201).json(await usersService.createUser(req.body));
         } catch (error) {
             sendError(res, error);
         }
