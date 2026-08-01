@@ -49,6 +49,31 @@ npm run db:generate   # changes in src/db/schema.ts → SQL file in drizzle/
 npm run db:migrate    # apply new migrations to the database
 ```
 
+Each service keeps its own journal table (`migrations.table` in `drizzle.config.ts`),
+so several services can migrate the same database independently.
+
+### Squashing migrations into one
+
+Local dev only — never do this after migrations ran in a shared environment.
+
+```bash
+# 1. delete the service's migration history and generate one fresh migration
+rm -rf services/<name>/drizzle
+npm run db:generate -w services/<name>
+
+# 2. recreate the database with an empty volume
+docker compose rm -sf postgres
+docker volume rm twitter-backend_postgres_data
+docker compose up -d --wait postgres
+
+# 3. apply migrations of ALL services (the database is empty now)
+npm run db:migrate
+```
+
+To drop a single not-yet-applied migration instead, use `npx drizzle-kit drop`
+inside the service directory — never delete migration files by hand, the
+`drizzle/meta` journal must stay in sync.
+
 ## API
 
 | Method | Path | Auth | Description |

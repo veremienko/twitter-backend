@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1785504347720,
-      "tag": "0000_blushing_spencer_smythe",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1785530886088,
-      "tag": "0001_youthful_namor",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1785567592338,
-      "tag": "0002_right_mysterio",
+      "when": 1785569131030,
+      "tag": "0000_wise_hedge_knight",
       "breakpoints": true
     }
   ]
