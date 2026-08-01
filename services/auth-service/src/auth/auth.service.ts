@@ -1,4 +1,4 @@
-import {HttpError, parseBody, type RedisClient} from "@twitter/shared";
+import {HttpError, parseBody, type NewUser, type RedisClient} from "@twitter/shared";
 import bcrypt from "bcrypt";
 import {z} from "zod";
 
@@ -29,10 +29,11 @@ export class AuthService {
     async register(data: unknown) {
         const { email, password, name, age, sex } = parseBody(RegistrationSchema, data);
         const passwordHash = await bcrypt.hash(password, 12);
+        const newUser: NewUser = { email, passwordHash, name, age, sex };
         const response = await fetch(`${USER_SERVICE_URL}/users`, {
             method: 'POST',
             headers: { 'content-type': 'application/json', 'x-internal-token': INTERNAL_TOKEN },
-            body: JSON.stringify({ email, passwordHash, name, age, sex }),
+            body: JSON.stringify(newUser),
         });
         if (response.status === 409) {
             throw new HttpError(409, 'Email already exists');

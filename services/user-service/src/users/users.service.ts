@@ -1,5 +1,5 @@
 import {eq, inArray} from "drizzle-orm";
-import {HttpError, parseBody} from "@twitter/shared";
+import {HttpError, NewUserSchema, parseBody} from "@twitter/shared";
 import {z} from "zod";
 import {db} from "../db/client.ts";
 import {users} from "../db/schema.ts";
@@ -10,14 +10,6 @@ const UserIdsSchema = z.string({ error: 'ids query parameter is required' })
 
 const EmailSchema = z.string({ error: 'email query parameter is required' })
     .trim().toLowerCase().pipe(z.email('Valid email is required'));
-
-const NewUserSchema = z.object({
-    email: z.string().trim().toLowerCase().pipe(z.email('Valid email is required')),
-    passwordHash: z.string().min(1, 'passwordHash is required'),
-    name: z.string().trim().min(1, 'Name is required'),
-    age: z.int().min(1).max(150),
-    sex: z.enum(['male', 'female']),
-});
 
 export class UsersService {
     /** Resolve public profiles (id, name) by ids; used by twit-service. */

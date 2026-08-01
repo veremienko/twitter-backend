@@ -3,3 +3,4 @@ export type { Producer, Consumer } from 'kafkajs';
 export { createRedis, type RedisClient } from './redis.ts';
 export { TOPICS } from './topics.ts';
 export { HttpError, sendError, internalAuth, parseBody } from './http.ts';
+export { NewUserSchema, type NewUser } from './contracts/users.ts';
