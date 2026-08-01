@@ -20,9 +20,8 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
     const sid = req.cookies.sid;
     const session = sid && await redis.get(`session:${sid}`);
     if (!session) return res.status(401).json({ error: 'unauthorized' });
-    const { userId, email } = JSON.parse(session);
+    const { userId } = JSON.parse(session);
     res.locals.userId = String(userId);
-    res.locals.email = email;
     next();
 }
 
@@ -50,7 +49,7 @@ app.get('/api/twits', requireAuth, async (req, res) => {
 app.post('/api/twits', requireAuth, async (req, res) => {
     await forward(res, `${TWIT_SERVICE_URL}/twits`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-user-email': res.locals.email },
+        headers: { 'content-type': 'application/json', 'x-user-id': res.locals.userId },
         body: JSON.stringify(req.body),
     });
 });

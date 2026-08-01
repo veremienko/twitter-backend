@@ -13,7 +13,7 @@ async function main() {
     await consumer.run({
         eachMessage: async ({ message }) => {
             const twit = JSON.parse(message.value!.toString());
-            console.log(`Notification: new twit #${twit.id} by ${twit.author}: "${twit.text}"`);
+            console.log(`Notification: new twit #${twit.id} by ${twit.authorId}: "${twit.text}"`);
         },
     });
 

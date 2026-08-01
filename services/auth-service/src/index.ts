@@ -3,7 +3,6 @@ import express from "express";
 import {AuthService} from "./auth/auth.service.ts";
 import {authController as authRouter} from "./auth/auth.controller.ts";
 
-
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN;
 if (!INTERNAL_TOKEN) throw new Error('INTERNAL_TOKEN env var is required');
 

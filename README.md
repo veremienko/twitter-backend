@@ -74,6 +74,28 @@ To drop a single not-yet-applied migration instead, use `npx drizzle-kit drop`
 inside the service directory — never delete migration files by hand, the
 `drizzle/meta` journal must stay in sync.
 
+### Baseline: adopting an existing table (production-safe)
+
+When a table moves to a new service (or a fresh journal meets an existing schema),
+its `0000` migration fails with `relation already exists`. Never drop data:
+mark the migration as applied instead. Drizzle stores `sha256` of the SQL file
+and the `when` timestamp from `meta/_journal.json`:
+
+```bash
+# 1. verify the live table matches the migration (column by column)
+docker exec twitter-postgres psql -U twitter -d twitter -c '\d <table>'
+
+# 2. hash + timestamp of the migration being baselined
+shasum -a 256 services/<name>/drizzle/0000_*.sql
+cat services/<name>/drizzle/meta/_journal.json   # take "when"
+
+# 3. stamp the journal, then drop the previous owner's journal table
+docker exec twitter-postgres psql -U twitter -d twitter \
+  -c "INSERT INTO drizzle.<name>_migrations (hash, created_at) VALUES ('<sha256>', <when>)"
+
+# 4. npm run db:migrate now succeeds without executing anything
+```
+
 ## API
 
 | Method | Path | Auth | Description |

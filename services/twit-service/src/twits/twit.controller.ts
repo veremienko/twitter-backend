@@ -9,7 +9,7 @@ export function twitRouter(twitService: TwitService): Router {
         try {
             const twit = await twitService.createTwit({
                 text: req.body?.text,
-                email: req.headers['x-user-email'],
+                authorId: req.headers['x-user-id'],
             });
             res.status(201).json(twit);
         } catch (error) {

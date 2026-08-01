@@ -157,6 +157,7 @@ services:
       TWIT_SERVICE_PORT: 3002
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twitter
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      AUTH_SERVICE_URL: http://auth-service:3003
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:29092
     depends_on:
@@ -204,6 +205,38 @@ services:
           target: /app/packages/shared/src
         - action: rebuild
           path: ./services/auth-service/package.json
+
+  user-service:
+    build:
+      context: .
+      args:
+        SERVICE: user-service
+    container_name: twitter-user-service
+    profiles: [app]
+    environment:
+      USER_SERVICE_PORT: 3004
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twitter
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      AUTH_SERVICE_URL: http://auth-service:3003
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./services/user-service/src
+          target: /app/services/user-service/src
+        - action: sync+restart
+          path: ./packages/shared/src
+          target: /app/packages/shared/src
+        - action: rebuild
+          path: ./services/user-service/package.json
 
   notification-service:
     build:

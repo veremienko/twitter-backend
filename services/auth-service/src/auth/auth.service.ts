@@ -1,12 +1,11 @@
 import {HttpError, parseBody, type RedisClient} from "@twitter/shared";
-import {db} from "../db/client.ts";
-import {users} from "../db/schema.ts";
-import {eq} from "drizzle-orm";
 import bcrypt from "bcrypt";
 import {z} from "zod";
 
 const SESSION_TTL_SECONDS = 7 * 24 * 3600;
 const MIN_PASSWORD_LENGTH = 8;
+const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:3004';
+const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN!;
 
 const CredentialsSchema = z.object({
     email: z.string().trim().toLowerCase().pipe(z.email('Valid email is required')),
@@ -31,7 +30,11 @@ export class AuthService {
         const { email, password, name, age, sex } = parseBody(RegistrationSchema, data);
         const passwordHash = await bcrypt.hash(password, 12);
         try {
-            await db.insert(users).values({ email, passwordHash, name, age, sex });
+            await fetch(`${USER_SERVICE_URL}/users`, {
+                headers: { 'x-internal-token': INTERNAL_TOKEN },
+                method: 'POST',
+                body: JSON.stringify({ email, passwordHash, name, age, sex })
+            });
         } catch (error) {
             if (isUniqueViolation(error)) {
                 throw new HttpError(409, 'Email already exists');
@@ -43,7 +46,10 @@ export class AuthService {
 
     async login(data: unknown) {
         const { email, password } = parseBody(CredentialsSchema, data);
-        const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+        const response = await fetch(`${USER_SERVICE_URL}/users?emails[]=${email}`, {
+            headers: { 'x-internal-token': INTERNAL_TOKEN },
+        });
+        const [user]: { id: number; passwordHash: string }[] = await response.json();
         if (!user) {
             throw new HttpError(401, 'Invalid email or password');
         }
@@ -52,7 +58,7 @@ export class AuthService {
             throw new HttpError(401, 'Invalid email or password');
         }
         const sid = crypto.randomUUID();
-        await this.redis.set(`session:${sid}`, JSON.stringify({ userId: user.id, email: user.email }), { EX: SESSION_TTL_SECONDS });
+        await this.redis.set(`session:${sid}`, JSON.stringify({ userId: user.id }), { EX: SESSION_TTL_SECONDS });
         return { sid };
     }
 
