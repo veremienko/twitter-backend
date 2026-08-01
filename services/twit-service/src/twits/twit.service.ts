@@ -1,5 +1,6 @@
 import { desc } from 'drizzle-orm';
-import { HttpError, TOPICS, type Producer, type RedisClient } from '@twitter/shared';
+import { z } from 'zod';
+import { parseBody, TOPICS, type Producer, type RedisClient } from '@twitter/shared';
 import { db } from '../db/client.ts';
 import { twits, type Twit } from '../db/schema.ts';
 
@@ -7,6 +8,15 @@ const CACHE_KEY = 'twits:all';
 const CACHE_TTL_SECONDS = 30;
 const MAX_TEXT_LENGTH = 280;
 const MAX_AUTHOR_LENGTH = 64;
+
+const TwitSchema = z.object({
+    email: z.string({ error: 'x-user-email header is required' })
+        .min(1, 'x-user-email header is required')
+        .max(MAX_AUTHOR_LENGTH, 'x-user-email header is required'),
+    text: z.string().trim()
+        .min(1, `text must be a non-empty string up to ${MAX_TEXT_LENGTH} characters`)
+        .max(MAX_TEXT_LENGTH, `text must be a non-empty string up to ${MAX_TEXT_LENGTH} characters`),
+});
 
 export class TwitService {
     redis: RedisClient;
@@ -18,8 +28,8 @@ export class TwitService {
     }
 
     /** Insert a twit, invalidate the cache and publish twit.created to Kafka (best effort). */
-    async createTwit(data: { text: unknown; email: unknown }): Promise<Twit> {
-        const { text, email } = validateTwit(data);
+    async createTwit(data: unknown): Promise<Twit> {
+        const { text, email } = parseBody(TwitSchema, data);
         const [twit] = await db.insert(twits).values({
             author: email,
             text,
@@ -45,15 +55,4 @@ export class TwitService {
         await this.redis.set(CACHE_KEY, JSON.stringify(result), { EX: CACHE_TTL_SECONDS });
         return result;
     }
-}
-
-function validateTwit(data: { text: unknown; email: unknown }): { text: string; email: string } {
-    const { text, email } = data;
-    if (typeof email !== 'string' || email.length === 0 || email.length > MAX_AUTHOR_LENGTH) {
-        throw new HttpError(400, 'x-user-email header is required');
-    }
-    if (typeof text !== 'string' || text.trim().length === 0 || text.length > MAX_TEXT_LENGTH) {
-        throw new HttpError(400, `text must be a non-empty string up to ${MAX_TEXT_LENGTH} characters`);
-    }
-    return { text, email };
 }

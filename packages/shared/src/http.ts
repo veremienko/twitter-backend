@@ -1,4 +1,5 @@
 import type { RequestHandler, Response } from 'express';
+import type { ZodType } from 'zod';
 
 /** Error with an HTTP status code, safe to expose to the client. */
 export class HttpError extends Error {
@@ -8,6 +9,17 @@ export class HttpError extends Error {
         super(message);
         this.status = status;
     }
+}
+
+/** Validate data against a zod schema; throw HttpError 400 with the first issue on failure. */
+export function parseBody<T>(schema: ZodType<T>, data: unknown): T {
+    const result = schema.safeParse(data);
+    if (!result.success) {
+        const issue = result.error.issues[0]!;
+        const path = issue.path.join('.');
+        throw new HttpError(400, path ? `${path}: ${issue.message}` : issue.message);
+    }
+    return result.data;
 }
 
 /** Send HttpError as-is; log anything else and reply with a generic 500. */

@@ -1,12 +1,24 @@
-import {HttpError, type RedisClient} from "@twitter/shared";
+import {HttpError, parseBody, type RedisClient} from "@twitter/shared";
 import {db} from "../db/client.ts";
 import {users} from "../db/schema.ts";
 import {eq} from "drizzle-orm";
 import bcrypt from "bcrypt";
+import {z} from "zod";
 
 const SESSION_TTL_SECONDS = 7 * 24 * 3600;
-const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 const MIN_PASSWORD_LENGTH = 8;
+
+const CredentialsSchema = z.object({
+    email: z.string().trim().toLowerCase().pipe(z.email('Valid email is required')),
+    password: z.string().min(1, 'Password is required'),
+});
+
+const RegistrationSchema = CredentialsSchema.extend({
+    password: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`),
+    name: z.string().trim().min(1, 'Name is required'),
+    age: z.int().min(1).max(150),
+    sex: z.enum(['male', 'female']),
+});
 
 export class AuthService {
     redis:RedisClient;
@@ -16,14 +28,10 @@ export class AuthService {
     }
 
     async register(data: unknown) {
-        const { email, password } = validateCredentials(data);
-        if (password.length < MIN_PASSWORD_LENGTH) {
-            throw new HttpError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-        }
-        const normalizedEmail = email.trim().toLowerCase();
-        const hash = await bcrypt.hash(password, 12);
+        const { email, password, name, age, sex } = parseBody(RegistrationSchema, data);
+        const passwordHash = await bcrypt.hash(password, 12);
         try {
-            await db.insert(users).values({ email: normalizedEmail, passwordHash: hash });
+            await db.insert(users).values({ email, passwordHash, name, age, sex });
         } catch (error) {
             if (isUniqueViolation(error)) {
                 throw new HttpError(409, 'Email already exists');
@@ -34,9 +42,8 @@ export class AuthService {
     }
 
     async login(data: unknown) {
-        const { email, password } = validateCredentials(data);
-        const normalizedEmail = email.trim().toLowerCase();
-        const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+        const { email, password } = parseBody(CredentialsSchema, data);
+        const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
         if (!user) {
             throw new HttpError(401, 'Invalid email or password');
         }
@@ -52,17 +59,6 @@ export class AuthService {
     async logout(sid: string) {
         await this.redis.del(`session:${sid}`);
     }
-}
-
-function validateCredentials(body: unknown): { email: string; password: string } {
-    const { email, password } = (body ?? {}) as Record<string, unknown>;
-    if (typeof email !== 'string' || !EMAIL_PATTERN.test(email.trim())) {
-        throw new HttpError(400, 'Valid email is required');
-    }
-    if (typeof password !== 'string' || password.length === 0) {
-        throw new HttpError(400, 'Password is required');
-    }
-    return { email, password };
 }
 
 /** Detect a Postgres unique-constraint violation (code 23505), possibly wrapped by drizzle. */
