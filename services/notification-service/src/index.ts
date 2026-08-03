@@ -18,7 +18,6 @@ async function main() {
             );
         },
     });
-
     console.log(`notification-service consuming topic ${TOPICS.TWIT_CREATED}`);
 }
 

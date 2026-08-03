@@ -1,10 +1,13 @@
 import express from 'express';
 import { createKafka, createRedis } from '@twitter/shared';
 import { pool } from './db/client.ts';
+import { Partitioners } from 'kafkajs';
 
 async function main() {
     const redis = await createRedis();
-    const producer = createKafka('health').producer();
+    const producer = createKafka('health').producer({
+        createPartitioner: Partitioners.DefaultPartitioner,
+    });
     await producer.connect();
 
     const app = express();
