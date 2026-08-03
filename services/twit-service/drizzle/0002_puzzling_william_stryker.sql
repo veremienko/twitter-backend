@@ -1,0 +1,1 @@
+ALTER TABLE "likes" ADD CONSTRAINT "likes_twit_id_user_id_unique" UNIQUE("twit_id","user_id");
