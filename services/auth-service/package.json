@@ -1,19 +1,19 @@
 {
-  "name": "auth-service",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "node --watch --env-file=../../.env src/index.ts"
-  },
-  "dependencies": {
-    "@twitter/shared": "*",
-    "bcrypt": "^6.0.0",
-    "express": "^5.2.1",
-    "zod": "^4.4.3"
-  },
-  "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
-    "@types/express": "^5.0.5"
-  }
+    "name": "auth-service",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "node --watch --env-file=../../.env src/index.ts"
+    },
+    "dependencies": {
+        "@twitter/shared": "*",
+        "bcrypt": "^6.0.0",
+        "express": "^5.2.1",
+        "zod": "^4.4.3"
+    },
+    "devDependencies": {
+        "@types/bcrypt": "^6.0.0",
+        "@types/express": "^5.0.5"
+    }
 }

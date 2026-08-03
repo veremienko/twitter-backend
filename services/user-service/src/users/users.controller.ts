@@ -1,13 +1,15 @@
 import { Router } from 'express';
-import {sendError} from "@twitter/shared";
-import type {UsersService} from "./users.service.ts";
+import { sendError } from '@twitter/shared';
+import type { UsersService } from './users.service.ts';
 
 export function usersController(usersService: UsersService): Router {
     const router = Router();
 
     router.get('/users', async (req, res) => {
         try {
-            res.status(200).json(await usersService.getUsersByIds(req.query.ids));
+            res.status(200).json(
+                await usersService.getUsersByIds(req.query.ids),
+            );
         } catch (error) {
             sendError(res, error);
         }
@@ -15,7 +17,9 @@ export function usersController(usersService: UsersService): Router {
 
     router.get('/users/by-email', async (req, res) => {
         try {
-            res.status(200).json(await usersService.getUserByEmail(req.query.email));
+            res.status(200).json(
+                await usersService.getUserByEmail(req.query.email),
+            );
         } catch (error) {
             sendError(res, error);
         }

@@ -1,18 +1,18 @@
 {
-  "name": "api-gateway",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "node --watch --env-file=../../.env src/index.ts"
-  },
-  "dependencies": {
-    "@twitter/shared": "*",
-    "express": "^5.2.1",
-    "cookie-parser": "^1.4.6"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.5",
-    "@types/cookie-parser": "^1.4.3"
-  }
+    "name": "api-gateway",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "node --watch --env-file=../../.env src/index.ts"
+    },
+    "dependencies": {
+        "@twitter/shared": "*",
+        "express": "^5.2.1",
+        "cookie-parser": "^1.4.6"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.5",
+        "@types/cookie-parser": "^1.4.3"
+    }
 }

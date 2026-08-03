@@ -17,7 +17,10 @@ export function parseBody<T>(schema: ZodType<T>, data: unknown): T {
     if (!result.success) {
         const issue = result.error.issues[0]!;
         const path = issue.path.join('.');
-        throw new HttpError(400, path ? `${path}: ${issue.message}` : issue.message);
+        throw new HttpError(
+            400,
+            path ? `${path}: ${issue.message}` : issue.message,
+        );
     }
     return result.data;
 }

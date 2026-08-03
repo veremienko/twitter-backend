@@ -8,6 +8,8 @@ export default defineConfig({
         table: 'twit_migrations',
     },
     dbCredentials: {
-        url: process.env.DATABASE_URL ?? 'postgres://twitter:twitter@localhost:5432/twitter',
+        url:
+            process.env.DATABASE_URL ??
+            'postgres://twitter:twitter@localhost:5432/twitter',
     },
 });

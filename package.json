@@ -1,26 +1,29 @@
 {
-  "name": "twitter-backend",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "workspaces": [
-    "packages/*",
-    "services/*"
-  ],
-  "scripts": {
-    "dev": "concurrently -c auto \"npm:dev:*\"",
-    "dev:gateway": "npm run dev -w services/api-gateway",
-    "dev:health": "npm run dev -w services/health",
-    "dev:auth": "npm run dev -w services/auth-service",
-    "dev:user": "npm run dev -w services/user-service",
-    "dev:twit": "npm run dev -w services/twit-service",
-    "dev:notif": "npm run dev -w services/notification-service",
-    "db:generate": "npm run db:generate --workspaces --if-present",
-    "db:migrate": "npm run db:migrate --workspaces --if-present"
-  },
-  "devDependencies": {
-    "@types/node": "^25.0.10",
-    "concurrently": "^9.2.1",
-    "typescript": "^5.9.3"
-  }
+    "name": "twitter-backend",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "workspaces": [
+        "packages/*",
+        "services/*"
+    ],
+    "scripts": {
+        "dev": "concurrently -c auto \"npm:dev:*\"",
+        "dev:gateway": "npm run dev -w services/api-gateway",
+        "dev:health": "npm run dev -w services/health",
+        "dev:auth": "npm run dev -w services/auth-service",
+        "dev:user": "npm run dev -w services/user-service",
+        "dev:twit": "npm run dev -w services/twit-service",
+        "dev:notif": "npm run dev -w services/notification-service",
+        "db:generate": "npm run db:generate --workspaces --if-present",
+        "db:migrate": "npm run db:migrate --workspaces --if-present",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
+    },
+    "devDependencies": {
+        "@types/node": "^25.0.10",
+        "concurrently": "^9.2.1",
+        "prettier": "3.9.6",
+        "typescript": "^5.9.3"
+    }
 }

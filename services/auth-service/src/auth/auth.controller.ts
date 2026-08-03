@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import {sendError} from "@twitter/shared";
-import type {AuthService} from "./auth.service.ts";
+import { sendError } from '@twitter/shared';
+import type { AuthService } from './auth.service.ts';
 
 export function authController(authService: AuthService): Router {
     const router = Router();

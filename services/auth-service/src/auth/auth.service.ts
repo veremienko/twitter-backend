@@ -1,67 +1,103 @@
-import {HttpError, parseBody, type NewUser, type RedisClient} from "@twitter/shared";
-import bcrypt from "bcrypt";
-import {z} from "zod";
+import {
+    HttpError,
+    parseBody,
+    type NewUser,
+    type RedisClient,
+} from '@twitter/shared';
+import bcrypt from 'bcrypt';
+import { z } from 'zod';
 
 const SESSION_TTL_SECONDS = 7 * 24 * 3600;
 const MIN_PASSWORD_LENGTH = 8;
-const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? 'http://localhost:3004';
+const USER_SERVICE_URL =
+    process.env.USER_SERVICE_URL ?? 'http://localhost:3004';
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN!;
 
 const CredentialsSchema = z.object({
-    email: z.string().trim().toLowerCase().pipe(z.email('Valid email is required')),
+    email: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .pipe(z.email('Valid email is required')),
     password: z.string().min(1, 'Password is required'),
 });
 
 const RegistrationSchema = CredentialsSchema.extend({
-    password: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`),
+    password: z
+        .string()
+        .min(
+            MIN_PASSWORD_LENGTH,
+            `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+        ),
     name: z.string().trim().min(1, 'Name is required'),
     age: z.int().min(1).max(150),
     sex: z.enum(['male', 'female']),
 });
 
 export class AuthService {
-    redis:RedisClient;
+    redis: RedisClient;
 
     constructor(redis: RedisClient) {
         this.redis = redis;
     }
 
     async register(data: unknown) {
-        const { email, password, name, age, sex } = parseBody(RegistrationSchema, data);
+        const { email, password, name, age, sex } = parseBody(
+            RegistrationSchema,
+            data,
+        );
         const passwordHash = await bcrypt.hash(password, 12);
         const newUser: NewUser = { email, passwordHash, name, age, sex };
         const response = await fetch(`${USER_SERVICE_URL}/users`, {
             method: 'POST',
-            headers: { 'content-type': 'application/json', 'x-internal-token': INTERNAL_TOKEN },
+            headers: {
+                'content-type': 'application/json',
+                'x-internal-token': INTERNAL_TOKEN,
+            },
             body: JSON.stringify(newUser),
         });
         if (response.status === 409) {
             throw new HttpError(409, 'Email already exists');
         }
         if (!response.ok) {
-            throw new Error(`user-service POST /users responded with ${response.status}`);
+            throw new Error(
+                `user-service POST /users responded with ${response.status}`,
+            );
         }
         return { message: 'User registered successfully' };
     }
 
     async login(data: unknown) {
         const { email, password } = parseBody(CredentialsSchema, data);
-        const response = await fetch(`${USER_SERVICE_URL}/users/by-email?email=${encodeURIComponent(email)}`, {
-            headers: { 'x-internal-token': INTERNAL_TOKEN },
-        });
+        const response = await fetch(
+            `${USER_SERVICE_URL}/users/by-email?email=${encodeURIComponent(email)}`,
+            {
+                headers: { 'x-internal-token': INTERNAL_TOKEN },
+            },
+        );
         if (response.status === 404) {
             throw new HttpError(401, 'Invalid email or password');
         }
         if (!response.ok) {
-            throw new Error(`user-service GET /users/by-email responded with ${response.status}`);
+            throw new Error(
+                `user-service GET /users/by-email responded with ${response.status}`,
+            );
         }
-        const user: { id: number; passwordHash: string } = await response.json();
-        const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+        const user: { id: number; passwordHash: string } =
+            await response.json();
+        const isPasswordValid = await bcrypt.compare(
+            password,
+            user.passwordHash,
+        );
         if (!isPasswordValid) {
             throw new HttpError(401, 'Invalid email or password');
         }
         const sid = crypto.randomUUID();
-        await this.redis.set(`session:${sid}`, JSON.stringify({ userId: user.id }), { EX: SESSION_TTL_SECONDS });
+        await this.redis.set(
+            `session:${sid}`,
+            JSON.stringify({ userId: user.id }),
+            { EX: SESSION_TTL_SECONDS },
+        );
         return { sid };
     }
 
