@@ -1,13 +1,14 @@
-import { desc } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
     parseBody,
     TOPICS,
     type Producer,
     type RedisClient,
+    HttpError,
 } from '@twitter/shared';
 import { db } from '../db/client.ts';
-import { twits, type Twit } from '../db/schema.ts';
+import { twits, type Twit, likes } from '../db/schema.ts';
 
 const CACHE_KEY = 'twits:all';
 const CACHE_TTL_SECONDS = 30;
@@ -36,6 +37,14 @@ const TwitSchema = z.object({
         ),
 });
 
+const TwitLikeSchema = z.object({
+    userId: z.coerce
+        .number({ error: 'x-user-id header is required' })
+        .int()
+        .positive(),
+    twitId: z.coerce.number({ error: 'twitId is required' }).int().positive(),
+});
+
 export class TwitService {
     redis: RedisClient;
     producer: Producer;
@@ -53,6 +62,7 @@ export class TwitService {
             .values({
                 authorId,
                 text,
+                likes: 0,
             })
             .returning();
         await this.redis.del(CACHE_KEY);
@@ -87,6 +97,36 @@ export class TwitService {
             EX: CACHE_TTL_SECONDS,
         });
         return enriched;
+    }
+
+    async postLike(data: unknown): Promise<Twit> {
+        const { twitId, userId } = parseBody(TwitLikeSchema, data);
+
+        try {
+            const twit = await db.transaction(async (tx) => {
+                await tx.insert(likes).values({ twitId, userId });
+
+                const [updated] = await tx
+                    .update(twits)
+                    .set({ likes: sql`${twits.likes} + 1` })
+                    .where(eq(twits.id, twitId))
+                    .returning();
+
+                if (!updated) throw new HttpError(404, 'twit not found');
+
+                return updated;
+            });
+            await this.redis.del(CACHE_KEY);
+            return twit;
+        } catch (error) {
+            if (
+                error instanceof Error &&
+                (error.cause as { code?: string })?.code === '23505'
+            ) {
+                throw new HttpError(409, 'already liked');
+            }
+            throw error;
+        }
     }
 }
 

@@ -26,5 +26,17 @@ export function twitRouter(twitService: TwitService): Router {
         }
     });
 
+    router.post('/twits/:twitId/like', async (req, res) => {
+        try {
+            const result = await twitService.postLike({
+                twitId: req.params.twitId,
+                userId: req.headers['x-user-id'],
+            });
+            res.status(200).json(result);
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
     return router;
 }

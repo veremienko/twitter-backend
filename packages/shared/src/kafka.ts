@@ -16,7 +16,9 @@ export async function ensureTopics(kafka: Kafka, topics: string[]) {
     const existing = await admin.listTopics();
     const missing = topics.filter((topic) => !existing.includes(topic));
     if (missing.length) {
-        await admin.createTopics({ topics: missing.map((topic) => ({ topic })) });
+        await admin.createTopics({
+            topics: missing.map((topic) => ({ topic })),
+        });
     }
     await admin.disconnect();
 }
