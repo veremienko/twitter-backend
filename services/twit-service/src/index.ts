@@ -9,7 +9,9 @@ if (!INTERNAL_TOKEN) throw new Error('INTERNAL_TOKEN env var is required');
 
 async function main() {
     const redis = await createRedis();
-    const producer = createKafka('twit-service').producer({createPartitioner: Partitioners.DefaultPartitioner});
+    const producer = createKafka('twit-service').producer({
+        createPartitioner: Partitioners.DefaultPartitioner,
+    });
     await producer.connect();
 
     const app = express();
