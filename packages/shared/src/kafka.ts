@@ -13,6 +13,10 @@ export function createKafka(clientId: string): Kafka {
 export async function ensureTopics(kafka: Kafka, topics: string[]) {
     const admin = kafka.admin();
     await admin.connect();
-    await admin.createTopics({ topics: topics.map((topic) => ({ topic })) });
+    const existing = await admin.listTopics();
+    const missing = topics.filter((topic) => !existing.includes(topic));
+    if (missing.length) {
+        await admin.createTopics({ topics: missing.map((topic) => ({ topic })) });
+    }
     await admin.disconnect();
 }
