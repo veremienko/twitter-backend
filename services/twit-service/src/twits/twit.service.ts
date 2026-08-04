@@ -78,16 +78,30 @@ export class TwitService {
             .select()
             .from(twits)
             .orderBy(desc(twits.createdAt));
-        const names = await fetchAuthorNames([
-            ...new Set(result.map((twit) => twit.authorId)),
-        ]);
+        let names = new Map<number, string>();
+        let degraded = false;
+
+        try {
+            names = await fetchAuthorNames([
+                ...new Set(result.map((twit) => twit.authorId)),
+            ]);
+        } catch (error) {
+            degraded = true;
+            console.error(
+                'user-service unavailable, serving feed without author names:',
+                error,
+            );
+        }
+
         const enriched = result.map((twit) => ({
             ...twit,
             authorName: names.get(twit.authorId) ?? null,
         }));
-        await this.redis.set(CACHE_KEY, JSON.stringify(enriched), {
-            EX: CACHE_TTL_SECONDS,
-        });
+        if (!degraded) {
+            await this.redis.set(CACHE_KEY, JSON.stringify(enriched), {
+                EX: CACHE_TTL_SECONDS,
+            });
+        }
         return enriched;
     }
 
@@ -129,6 +143,7 @@ async function fetchAuthorNames(ids: number[]): Promise<Map<number, string>> {
         `${USER_SERVICE_URL}/users?ids=${ids.join(',')}`,
         {
             headers: { 'x-internal-token': INTERNAL_TOKEN },
+            signal: AbortSignal.timeout(2000),
         },
     );
     if (!response.ok)
