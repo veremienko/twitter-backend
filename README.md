@@ -100,14 +100,24 @@ docker exec twitter-postgres psql -U twitter -d twitter \
 
 ## API
 
-| Method | Path          | Auth   | Description                                           |
-| ------ | ------------- | ------ | ----------------------------------------------------- |
-| POST   | /api/register | —      | register `{email, password}`                          |
-| POST   | /api/login    | —      | login, sets `sid` cookie                              |
-| POST   | /api/logout   | —      | deletes the session, clears the cookie                |
-| GET    | /api/twits    | cookie | twit feed                                             |
-| POST   | /api/twits    | cookie | create a twit `{text}`; author comes from the session |
-| GET    | /api/health   | —      | infrastructure status                                 |
+Interactive docs (Swagger UI): **http://localhost:3000/api/docs** — raw spec at
+`/api/openapi.json`. Request bodies in the spec are generated from the same zod contracts the
+services validate with (`packages/shared/src/contracts/`), so they cannot drift from the code.
+
+`POST /api/login` through _Try it out_ leaves the `sid` cookie in the browser — the docs are
+served from the same origin as the API, so the authenticated endpoints work right after it.
+
+| Method | Path                    | Auth   | Description                                           |
+| ------ | ----------------------- | ------ | ----------------------------------------------------- |
+| POST   | /api/register           | —      | register `{email, password, name, age, sex}`          |
+| POST   | /api/login              | —      | login, sets `sid` cookie                              |
+| POST   | /api/logout             | —      | deletes the session, clears the cookie                |
+| GET    | /api/twits              | cookie | twit feed                                             |
+| POST   | /api/twits              | cookie | create a twit `{text}`; author comes from the session |
+| POST   | /api/twits/:twitId/like | cookie | like a twit, once per user; bumps the counter         |
+| GET    | /api/health             | —      | infrastructure status                                 |
+| GET    | /api/docs               | —      | Swagger UI                                            |
+| GET    | /api/openapi.json       | —      | OpenAPI 3.1 spec                                      |
 
 ## Tools
 

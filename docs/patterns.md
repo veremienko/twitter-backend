@@ -21,7 +21,9 @@
 
 `packages/shared` (npm workspaces, `@twitter/shared`) — спільні клієнти Kafka/Redis,
 назви топіків (`TOPICS`), HTTP-хелпери (`HttpError`, `sendError`, `parseBody`,
-`internalAuth`) і контракти між сервісами (`NewUserSchema`). Один код — один формат.
+`internalAuth`) і контракти в `contracts/`: між сервісами (`NewUserSchema`) та публічні
+схеми запитів, з яких gateway генерує OpenAPI (`RegistrationSchema`, `CredentialsSchema`,
+`NewTwitSchema`). Один код — один формат.
 
 ### Database-per-service (логічно)
 
@@ -130,7 +132,7 @@ drizzle-kit: `db:generate` → `db:migrate`. Застосовані міграц
 
 ### Router-per-domain
 
-Роути gateway розкладені по доменах у `src/routes/` (auth, health, twits) і
+Роути gateway розкладені по доменах у `src/routes/` (auth, health, twits, docs) і
 збираються в один `apiRouter` (`routes/index.ts`), який монтується на `/api` одним
 рядком.
 
@@ -139,6 +141,27 @@ drizzle-kit: `db:generate` → `db:migrate`. Застосовані міграц
 Кожен вхід проходить Zod-схему через `parseBody` (одразу `HttpError 400` з першою
 проблемою). Обов'язкові env-змінні перевіряються при старті процесу
 (`if (!INTERNAL_TOKEN) throw ...`) — сервіс падає одразу, а не на першому запиті.
+
+### Схема як єдине джерело правди (OpenAPI з zod)
+
+Публічні схеми запитів лежать у `packages/shared/src/contracts/` — сервіс валідує ними
+вхід, а gateway генерує з них OpenAPI-спеку через вбудований у zod 4
+`z.toJSONSchema()` (`api-gateway/src/openapi.ts`, Swagger UI на `/api/docs`). Одна схема
+обслуговує і валідацію, і документацію, тому спека не може розійтися з кодом — на відміну
+від спеки, дописаної руками або зібраної з JSDoc-комментарів.
+
+Два нюанси, які варто знати:
+
+- `io: 'input'` описує те, що надсилає клієнт (до `trim`/`toLowerCase`), і саме це означає
+  request body. Але на вхідній стороні `.pipe(z.email())` — просто рядок, тому
+  `format: email` губиться; повертаємо його через `.meta()`, яка впливає лише на спеку
+  й не змінює валідацію.
+- Ідентичність у тіло запиту не потрапляє: `NewTwitSchema` описує тільки `{text}`, а
+  twit-service розширює її полем `authorId` з хедера `x-user-id` (`CreateTwitSchema`).
+  Клієнт фізично не може підмінити автора через body.
+
+Відповіді описані в `openapi.ts` руками: у рантаймі їх ніхто не валідує, тож видавати їх
+за контракт було б неправдою.
 
 ### Централізована обробка помилок
 

@@ -1,6 +1,7 @@
 import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
+    NewTwitSchema,
     parseBody,
     TOPICS,
     type RedisClient,
@@ -11,29 +12,22 @@ import { twits, type Twit, likes, outbox } from '../db/schema.ts';
 
 const CACHE_KEY = 'twits:all';
 const CACHE_TTL_SECONDS = 30;
-const MAX_TEXT_LENGTH = 280;
 const USER_SERVICE_URL =
     process.env.USER_SERVICE_URL ?? 'http://localhost:3004';
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN!;
 
 export type TwitWithAuthor = Twit & { authorName: string | null };
 
-const TwitSchema = z.object({
+/**
+ * The public body contract plus the identity twit-service takes from `x-user-id`.
+ * `authorId` stays first so a request missing both still reports the header issue.
+ */
+const CreateTwitSchema = z.object({
     authorId: z.coerce
         .number({ error: 'x-user-id header is required' })
         .int()
         .positive(),
-    text: z
-        .string()
-        .trim()
-        .min(
-            1,
-            `text must be a non-empty string up to ${MAX_TEXT_LENGTH} characters`,
-        )
-        .max(
-            MAX_TEXT_LENGTH,
-            `text must be a non-empty string up to ${MAX_TEXT_LENGTH} characters`,
-        ),
+    ...NewTwitSchema.shape,
 });
 
 const TwitLikeSchema = z.object({
@@ -53,7 +47,7 @@ export class TwitService {
 
     /** Insert a twit and its twit.created outbox event in one transaction, then invalidate the cache. */
     async createTwit(data: unknown): Promise<Twit> {
-        const { text, authorId } = parseBody(TwitSchema, data);
+        const { text, authorId } = parseBody(CreateTwitSchema, data);
         const result = await db.transaction(async (tx) => {
             const [twit] = await tx
                 .insert(twits)

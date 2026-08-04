@@ -1,38 +1,17 @@
 import {
+    CredentialsSchema,
     HttpError,
     parseBody,
+    RegistrationSchema,
     type NewUser,
     type RedisClient,
 } from '@twitter/shared';
 import bcrypt from 'bcrypt';
-import { z } from 'zod';
 
 const SESSION_TTL_SECONDS = 7 * 24 * 3600;
-const MIN_PASSWORD_LENGTH = 8;
 const USER_SERVICE_URL =
     process.env.USER_SERVICE_URL ?? 'http://localhost:3004';
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN!;
-
-const CredentialsSchema = z.object({
-    email: z
-        .string()
-        .trim()
-        .toLowerCase()
-        .pipe(z.email('Valid email is required')),
-    password: z.string().min(1, 'Password is required'),
-});
-
-const RegistrationSchema = CredentialsSchema.extend({
-    password: z
-        .string()
-        .min(
-            MIN_PASSWORD_LENGTH,
-            `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-        ),
-    name: z.string().trim().min(1, 'Name is required'),
-    age: z.int().min(1).max(150),
-    sex: z.enum(['male', 'female']),
-});
 
 export class AuthService {
     redis: RedisClient;
