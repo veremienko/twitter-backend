@@ -19,4 +19,12 @@ export const likes = pgTable(
     (t) => [unique().on(t.twitId, t.userId)],
 );
 
+export const outbox = pgTable('outbox', {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    topic: text().notNull(),
+    payload: text().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    sentAt: timestamp('sent_at'),
+});
+
 export type Twit = typeof twits.$inferSelect;

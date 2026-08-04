@@ -3,12 +3,11 @@ import { z } from 'zod';
 import {
     parseBody,
     TOPICS,
-    type Producer,
     type RedisClient,
     HttpError,
 } from '@twitter/shared';
 import { db } from '../db/client.ts';
-import { twits, type Twit, likes } from '../db/schema.ts';
+import { twits, type Twit, likes, outbox } from '../db/schema.ts';
 
 const CACHE_KEY = 'twits:all';
 const CACHE_TTL_SECONDS = 30;
@@ -47,34 +46,33 @@ const TwitLikeSchema = z.object({
 
 export class TwitService {
     redis: RedisClient;
-    producer: Producer;
 
-    constructor(redis: RedisClient, producer: Producer) {
+    constructor(redis: RedisClient) {
         this.redis = redis;
-        this.producer = producer;
     }
 
-    /** Insert a twit, invalidate the cache and publish twit.created to Kafka (best effort). */
+    /** Insert a twit and its twit.created outbox event in one transaction, then invalidate the cache. */
     async createTwit(data: unknown): Promise<Twit> {
         const { text, authorId } = parseBody(TwitSchema, data);
-        const [twit] = await db
-            .insert(twits)
-            .values({
-                authorId,
-                text,
-                likes: 0,
-            })
-            .returning();
-        await this.redis.del(CACHE_KEY);
-        try {
-            await this.producer.send({
+        const result = await db.transaction(async (tx) => {
+            const [twit] = await tx
+                .insert(twits)
+                .values({
+                    authorId,
+                    text,
+                    likes: 0,
+                })
+                .returning();
+
+            await tx.insert(outbox).values({
                 topic: TOPICS.TWIT_CREATED,
-                messages: [{ value: JSON.stringify(twit) }],
+                payload: JSON.stringify(twit),
             });
-        } catch (error) {
-            console.error('Failed to publish twit.created event:', error);
-        }
-        return twit!;
+            return twit;
+        });
+
+        await this.redis.del(CACHE_KEY);
+        return result;
     }
 
     /** List twits with author names, newest first, cached in Redis for a short time. */

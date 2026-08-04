@@ -3,6 +3,7 @@ import { createKafka, createRedis, internalAuth } from '@twitter/shared';
 import { TwitService } from './twits/twit.service.ts';
 import { twitRouter } from './twits/twit.controller.ts';
 import { Partitioners } from 'kafkajs';
+import { startOutboxRelay } from './outbox/relay.ts';
 
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN;
 if (!INTERNAL_TOKEN) throw new Error('INTERNAL_TOKEN env var is required');
@@ -19,7 +20,9 @@ async function main() {
 
     app.use(internalAuth(INTERNAL_TOKEN!));
 
-    const twitService = new TwitService(redis, producer);
+    startOutboxRelay(producer);
+
+    const twitService = new TwitService(redis);
     app.use(twitRouter(twitService));
 
     const port = process.env.TWIT_SERVICE_PORT ?? 3002;
