@@ -2,6 +2,7 @@ import {
     createKafka,
     createRedis,
     ensureTopics,
+    registerShutdown,
     TOPICS,
 } from '@twitter/shared';
 
@@ -42,6 +43,11 @@ async function main() {
         },
     });
     console.log(`notification-service consuming topic ${TOPICS.TWIT_CREATED}`);
+
+    registerShutdown(
+        () => consumer.disconnect(),
+        () => redis.quit(),
+    );
 }
 
 main();

@@ -1,5 +1,5 @@
 import express from 'express';
-import { createKafka, createRedis } from '@twitter/shared';
+import { createKafka, createRedis, registerShutdown } from '@twitter/shared';
 import { pool } from './db/client.ts';
 import { Partitioners } from 'kafkajs';
 
@@ -36,9 +36,16 @@ async function main() {
     });
 
     const port = process.env.HEALTH_SERVICE_PORT ?? 3001;
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
         console.log(`health started on port ${port}`);
     });
+
+    registerShutdown(
+        () => server.closeIdleConnections(),
+        () => new Promise((resolve) => server.close(resolve)),
+        () => producer.disconnect(),
+        () => redis.quit(),
+    );
 }
 
 main();

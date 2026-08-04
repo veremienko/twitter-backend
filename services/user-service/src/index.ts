@@ -1,7 +1,8 @@
 import express from 'express';
-import { internalAuth } from '@twitter/shared';
+import { internalAuth, registerShutdown } from '@twitter/shared';
 import { UsersService } from './users/users.service.ts';
 import { usersController as usersRouter } from './users/users.controller.ts';
+import { db } from './db/client.ts';
 
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN;
 if (!INTERNAL_TOKEN) throw new Error('INTERNAL_TOKEN env var is required');
@@ -17,9 +18,15 @@ const main = async () => {
     app.use('/', usersRouter(usersService));
 
     const port = process.env.USER_SERVICE_PORT ?? 3004;
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
         console.log(`user-service started on port ${port}`);
     });
+
+    registerShutdown(
+        () => server.closeIdleConnections(),
+        () => new Promise((resolve) => server.close(resolve)),
+        () => db.$client.end(),
+    );
 };
 
 main();

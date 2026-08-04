@@ -1,4 +1,4 @@
-import { createRedis, internalAuth } from '@twitter/shared';
+import { createRedis, internalAuth, registerShutdown } from '@twitter/shared';
 import express from 'express';
 import { AuthService } from './auth/auth.service.ts';
 import { authController as authRouter } from './auth/auth.controller.ts';
@@ -20,9 +20,15 @@ const main = async () => {
     app.use('/', authRouter(authService));
 
     const port = process.env.AUTH_SERVICE_PORT ?? 3003;
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
         console.log(`auth-service started on port ${port}`);
     });
+
+    registerShutdown(
+        () => server.closeIdleConnections(),
+        () => new Promise((resolve) => server.close(resolve)),
+        () => redis.quit(),
+    );
 };
 
 main();

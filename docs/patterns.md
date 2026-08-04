@@ -173,3 +173,21 @@ drizzle-kit: `db:generate` → `db:migrate`. Застосовані міграц
 
 Окремий сервіс `health` опитує Postgres/Redis/Kafka і віддає агрегований статус
 через `GET /api/health`.
+
+### Graceful shutdown
+
+`registerShutdown(...steps)` у `packages/shared/src/shutdown.ts`: вішається на
+`SIGTERM`/`SIGINT` (docker stop, Ctrl-C, рестарт `--watch`) і виконує кроки зупинки
+послідовно. Порядок завжди "вхід → поточна робота → клієнти":
+
+1. перестати брати нову роботу — `server.closeIdleConnections()` (порвати сплячі
+   keep-alive, інакше `close` чекатиме їх вічно) + `server.close()`;
+2. дочекатись поточної — активні HTTP-запити, поточний тік relay
+   (`stopRelay` чекає проміс активного тіка), `consumer.disconnect()` сам
+   дочекається `eachMessage`;
+3. закрити клієнти — `producer.disconnect()`, `redis.quit()`, `db.$client.end()`.
+
+Страховка: `setTimeout(() => process.exit(1), 10_000).unref()` — якщо щось зависло,
+процес все одно вийде, а по exit code видно, що вихід був брудний. Найпомітніший
+ефект — консюмер явно виходить з групи Kafka: партиція переїжджає за ~1с замість
+очікування session timeout (~30-45с після kill -9).

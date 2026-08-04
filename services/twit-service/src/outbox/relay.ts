@@ -5,31 +5,40 @@ import { db } from '../db/client.ts';
 
 /** Poll unsent outbox rows and publish them to Kafka, marking each as sent. */
 export const startOutboxRelay = (producer: Producer) => {
-    setInterval(async () => {
-        try {
-            const [row] = await db
-                .select()
-                .from(outbox)
-                .where(isNull(outbox.sentAt))
-                .orderBy(outbox.id)
-                .limit(1);
-            if (!row) return;
+    let currentTick = Promise.resolve();
 
-            await producer.send({
-                topic: row.topic,
-                messages: [
-                    {
-                        headers: { eventId: String(row.id) },
-                        value: row.payload,
-                    },
-                ],
-            });
-            await db
-                .update(outbox)
-                .set({ sentAt: new Date() })
-                .where(eq(outbox.id, row.id));
-        } catch (error) {
-            console.error('Outbox relay tick failed:', error);
-        }
+    const interval = setInterval(() => {
+        currentTick = (async () => {
+            try {
+                const [row] = await db
+                    .select()
+                    .from(outbox)
+                    .where(isNull(outbox.sentAt))
+                    .orderBy(outbox.id)
+                    .limit(1);
+                if (!row) return;
+
+                await producer.send({
+                    topic: row.topic,
+                    messages: [
+                        {
+                            headers: { eventId: String(row.id) },
+                            value: row.payload,
+                        },
+                    ],
+                });
+                await db
+                    .update(outbox)
+                    .set({ sentAt: new Date() })
+                    .where(eq(outbox.id, row.id));
+            } catch (error) {
+                console.error('Outbox relay tick failed:', error);
+            }
+        })();
     }, 1000);
+
+    return async () => {
+        clearInterval(interval);
+        await currentTick;
+    };
 };

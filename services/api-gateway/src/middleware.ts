@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import { createRedis } from '@twitter/shared';
 
-const redis = await createRedis();
+export const redis = await createRedis();
+
 export async function requireAuth(
     req: Request,
     res: Response,

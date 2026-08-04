@@ -16,3 +16,5 @@ export {
     MAX_TEXT_LENGTH,
     type NewTwit,
 } from './contracts/twits.ts';
+
+export { registerShutdown } from './shutdown.ts';
