@@ -17,4 +17,6 @@ export {
     type NewTwit,
 } from './contracts/twits.ts';
 
+export { PaginationSchema, type Pagination } from './contracts/pagination.ts';
+
 export { registerShutdown } from './shutdown.ts';

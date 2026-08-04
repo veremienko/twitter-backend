@@ -6,6 +6,7 @@ import {
     TOPICS,
     type RedisClient,
     HttpError,
+    PaginationSchema,
 } from '@twitter/shared';
 import { db } from '../db/client.ts';
 import { twits, type Twit, likes, outbox } from '../db/schema.ts';
@@ -70,14 +71,21 @@ export class TwitService {
     }
 
     /** List twits with author names, newest first, cached in Redis for a short time. */
-    async getTwits(): Promise<TwitWithAuthor[]> {
-        const cached = await this.redis.get(CACHE_KEY);
-        if (cached) return JSON.parse(cached);
+    async getTwits(data: unknown): Promise<TwitWithAuthor[]> {
+        const { limit, offset } = parseBody(PaginationSchema, data);
 
-        const result = await db
-            .select()
-            .from(twits)
-            .orderBy(desc(twits.createdAt));
+        const paginated = limit !== undefined && offset !== undefined;
+
+        if (!paginated) {
+            const cached = await this.redis.get(CACHE_KEY);
+            if (cached) return JSON.parse(cached);
+        }
+
+        const query = db.select().from(twits).orderBy(desc(twits.createdAt));
+        const result = paginated
+            ? await query.limit(limit).offset(offset)
+            : await query;
+
         let names = new Map<number, string>();
         let degraded = false;
 
@@ -97,7 +105,7 @@ export class TwitService {
             ...twit,
             authorName: names.get(twit.authorId) ?? null,
         }));
-        if (!degraded) {
+        if (!degraded && !paginated) {
             await this.redis.set(CACHE_KEY, JSON.stringify(enriched), {
                 EX: CACHE_TTL_SECONDS,
             });

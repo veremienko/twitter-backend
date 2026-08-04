@@ -8,7 +8,10 @@ const TWIT_SERVICE_URL =
 const twitsRouter = Router();
 
 twitsRouter.get('/twits', requireAuth, async (req, res) => {
-    await forward(res, `${TWIT_SERVICE_URL}/twits`);
+    const queryString = new URLSearchParams(
+        req.query as Record<string, string>,
+    ).toString();
+    await forward(res, `${TWIT_SERVICE_URL}/twits?${queryString}`);
 });
 twitsRouter.post('/twits', requireAuth, async (req, res) => {
     await forward(res, `${TWIT_SERVICE_URL}/twits`, {

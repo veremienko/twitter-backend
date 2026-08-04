@@ -30,6 +30,7 @@ describe('twit controller', () => {
     });
 
     beforeEach(async () => {
+        await redis.flushDb();
         await db.execute(
             sql`TRUNCATE twits, likes, outbox RESTART IDENTITY CASCADE`,
         );
@@ -42,8 +43,8 @@ describe('twit controller', () => {
         await db.$client.end();
     });
 
-    it('creates a twit and responds 201', async () => {
-        const res = await fetch(`${baseUrl}/twits`, {
+    function createTwit(text:string){
+        return fetch(`${baseUrl}/twits`, {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
@@ -51,9 +52,13 @@ describe('twit controller', () => {
                 'x-user-id': '1',
             },
             body: JSON.stringify({
-                text: 'test twit',
+                text,
             }),
-        });
+        })
+    }
+
+    it('creates a twit and responds 201', async () => {
+        const res = await createTwit('test twit');
         assert.equal(res.status, 201);
         const twit = await res.json();
         assert.equal(twit.text, 'test twit');
@@ -86,5 +91,82 @@ describe('twit controller', () => {
             body: '',
         });
         assert.equal(res.status, 400);
+    });
+
+    it('responds all twits for an empty query', async () => {
+        await createTwit('test twit 1');
+        await createTwit('test twit 2');
+        await createTwit('test twit 3');
+
+        const res = await fetch(`${baseUrl}/twits`, {
+            method: 'GET',
+            headers: {
+                'content-type': 'application/json',
+                'x-internal-token': process.env.INTERNAL_TOKEN!,
+                'x-user-id': '1',
+            },
+        });
+        const body = await res.json();
+        assert.equal(body.length, 3);
+    });
+
+    it('responds the first page for offset=0', async () => {
+        await createTwit('test twit 1');
+        await createTwit('test twit 2');
+        await createTwit('test twit 3');
+
+        const res = await fetch(`${baseUrl}/twits?limit=2&offset=0`, {
+            method: 'GET',
+            headers: {
+                'content-type': 'application/json',
+                'x-internal-token': process.env.INTERNAL_TOKEN!,
+                'x-user-id': '1',
+            },
+        });
+        const body = await res.json();
+        assert.equal(body.length, 2);
+    });
+
+    it('responds a different page for offset=2', async () => {
+        await createTwit('test twit 1');
+        await createTwit('test twit 2');
+        await createTwit('test twit 3');
+
+        const res1 = await fetch(`${baseUrl}/twits?limit=2&offset=0`, {
+            method: 'GET',
+            headers: {
+                'content-type': 'application/json',
+                'x-internal-token': process.env.INTERNAL_TOKEN!,
+                'x-user-id': '1',
+            },
+        });
+
+        const res2 = await fetch(`${baseUrl}/twits?limit=2&offset=2`, {
+            method: 'GET',
+            headers: {
+                'content-type': 'application/json',
+                'x-internal-token': process.env.INTERNAL_TOKEN!,
+                'x-user-id': '1',
+            },
+        });
+        const body1 = await res1.json();
+        const ids1 = body1.map((item: { id: number; }) => item.id);
+        const body2 = await res2.json();
+        const ids2 = body2.map((item: { id: number; }) => item.id);
+        assert.notDeepEqual(ids1, ids2);
+    });
+
+    it('responds 400 when limit is passed without offset', async () => {
+        const res = await fetch(`${baseUrl}/twits?limit=2`, {
+            method: 'GET',
+            headers: {
+                'content-type': 'application/json',
+                'x-internal-token': process.env.INTERNAL_TOKEN!,
+                'x-user-id': '1',
+            },
+        });
+        assert.equal(res.status, 400);
+        const body = await res.json();
+        assert.equal(body.error, 'limit and offset must be provided together');
     });
 });

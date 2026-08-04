@@ -19,7 +19,7 @@ export function twitRouter(twitService: TwitService): Router {
 
     router.get('/twits', async (req, res) => {
         try {
-            const result = await twitService.getTwits();
+            const result = await twitService.getTwits(req.query);
             res.status(200).json(result);
         } catch (error) {
             sendError(res, error);
