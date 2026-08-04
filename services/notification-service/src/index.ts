@@ -1,6 +1,13 @@
-import { createKafka, ensureTopics, TOPICS } from '@twitter/shared';
+import {
+    createKafka,
+    createRedis,
+    ensureTopics,
+    TOPICS,
+} from '@twitter/shared';
 
 async function main() {
+    const redis = await createRedis();
+
     const kafka = createKafka('notification-service');
     await ensureTopics(kafka, [TOPICS.TWIT_CREATED]);
 
@@ -12,6 +19,22 @@ async function main() {
 
     await consumer.run({
         eachMessage: async ({ message }) => {
+            const eventId = message.headers?.eventId?.toString();
+            if (!eventId) {
+                console.warn(
+                    'Message without eventId, processing without dedup',
+                );
+            } else {
+                const isNew = await redis.set(`processed:${eventId}`, '1', {
+                    NX: true,
+                    EX: 60 * 60 * 24 * 7,
+                });
+                if (!isNew) {
+                    console.log(`Skipping duplicate event ${eventId}`);
+                    return;
+                }
+            }
+
             const twit = JSON.parse(message.value!.toString());
             console.log(
                 `Notification: new twit #${twit.id} by ${twit.authorId}: "${twit.text}"`,

@@ -17,7 +17,12 @@ export const startOutboxRelay = (producer: Producer) => {
 
             await producer.send({
                 topic: row.topic,
-                messages: [{ value: row.payload }],
+                messages: [
+                    {
+                        headers: { eventId: String(row.id) },
+                        value: row.payload,
+                    },
+                ],
             });
             await db
                 .update(outbox)
