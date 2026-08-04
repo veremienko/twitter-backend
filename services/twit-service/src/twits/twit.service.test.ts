@@ -14,7 +14,9 @@ describe('TwitService.postLike', () => {
         const result = await db.execute(sql`SELECT current_database() AS name`);
         const dbName = result.rows[0]!.name as string;
         if (!dbName.endsWith('_test')) {
-            throw new Error(`Tests must run against a *_test database, got "${dbName}"`);
+            throw new Error(
+                `Tests must run against a *_test database, got "${dbName}"`,
+            );
         }
 
         redis = await createRedis();
@@ -74,16 +76,18 @@ describe('TwitService.postLike', () => {
     });
 
     it('rejects a like of a missing twit with 404 and rolls back the like row', async () => {
-        await assert.rejects(service.postLike({ twitId: 999, userId: 1 }), (err) => {
-            assert.ok(err instanceof HttpError);
-            assert.equal(err.status, 404);
-            return true;
-        });
+        await assert.rejects(
+            service.postLike({ twitId: 999, userId: 1 }),
+            (err) => {
+                assert.ok(err instanceof HttpError);
+                assert.equal(err.status, 404);
+                return true;
+            },
+        );
 
         const likesCount = await db.select().from(likes);
 
         assert.equal(likesCount.length, 0);
-
     });
 
     it('counts likes from different users independently', async () => {
