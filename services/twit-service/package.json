@@ -4,6 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "test": "DATABASE_URL=postgres://twitter:twitter@localhost:5432/twitter_test node --env-file=../../.env --test",
         "dev": "node --watch --env-file=../../.env src/index.ts",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate"

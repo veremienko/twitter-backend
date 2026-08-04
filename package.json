@@ -18,7 +18,8 @@
         "db:generate": "npm run db:generate --workspaces --if-present",
         "db:migrate": "npm run db:migrate --workspaces --if-present",
         "format": "prettier --write .",
-        "format:check": "prettier --check ."
+        "format:check": "prettier --check .",
+        "test": "npm test --workspaces --if-present"
     },
     "devDependencies": {
         "@types/node": "^25.0.10",
