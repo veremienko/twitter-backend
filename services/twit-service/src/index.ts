@@ -6,7 +6,7 @@ import { db } from './db/client.ts';
 import { createApp } from './app.ts';
 import { logger } from './logger.ts';
 
-async function main() {
+const main = async ()=> {
     const redis = await createRedis();
     const producer = createKafka('twit-service').producer({
         createPartitioner: Partitioners.DefaultPartitioner,

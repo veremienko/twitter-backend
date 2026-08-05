@@ -10,7 +10,7 @@ import {
 
 const logger = createLogger('notification-service');
 
-async function main() {
+const main = async ()=> {
     const redis = await createRedis();
 
     const kafka = createKafka('notification-service');

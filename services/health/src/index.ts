@@ -6,7 +6,7 @@ import { pool } from './db/client.ts';
 
 const logger = createLogger('health');
 
-async function main() {
+const main = async ()=> {
     const redis = await createRedis();
 
     await producer.connect();
