@@ -24,3 +24,5 @@ export { requestContext, requestContextMiddleware } from './context.ts';
 export { createLogger } from './logger.ts';
 
 export { registerShutdown } from './shutdown.ts';
+
+export { metricsHandler } from './prometheus.ts';

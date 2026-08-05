@@ -1,5 +1,9 @@
 import express from 'express';
-import { internalAuth, requestContextMiddleware } from '@twitter/shared';
+import {
+    internalAuth,
+    metricsHandler,
+    requestContextMiddleware,
+} from '@twitter/shared';
 import type { TwitService } from './twits/twit.service.ts';
 import { twitRouter } from './twits/twit.controller.ts';
 import { logger } from './logger.ts';
@@ -20,6 +24,7 @@ export function createApp(twitService: TwitService) {
         });
         next();
     });
+    app.get('/metrics', metricsHandler);
     app.use(internalAuth(INTERNAL_TOKEN!));
     app.use(twitRouter(twitService));
     return app;

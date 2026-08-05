@@ -1,9 +1,4 @@
-import {
-    createKafka,
-    createLogger,
-    createRedis,
-    registerShutdown,
-} from '@twitter/shared';
+import { createKafka, createRedis, registerShutdown } from '@twitter/shared';
 import { TwitService } from './twits/twit.service.ts';
 import { Partitioners } from 'kafkajs';
 import { startOutboxRelay } from './outbox/relay.ts';

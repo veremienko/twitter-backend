@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import apiRouter from './routes/index.ts';
 import {
     createLogger,
+    metricsHandler,
     registerShutdown,
     requestContextMiddleware,
 } from '@twitter/shared';
@@ -24,6 +25,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api', apiRouter);
+app.get('/metrics', metricsHandler);
 
 const port = process.env.GATEWAY_PORT ?? 3000;
 const server = app.listen(port, () => {
