@@ -19,4 +19,8 @@ export {
 
 export { PaginationSchema, type Pagination } from './contracts/pagination.ts';
 
+export { requestContext, requestContextMiddleware } from './context.ts';
+
+export { createLogger } from './logger.ts';
+
 export { registerShutdown } from './shutdown.ts';

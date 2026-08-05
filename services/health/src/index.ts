@@ -1,7 +1,15 @@
 import express from 'express';
-import { createKafka, createRedis, registerShutdown } from '@twitter/shared';
+import {
+    createKafka,
+    createLogger,
+    createRedis,
+    registerShutdown,
+    requestContextMiddleware,
+} from '@twitter/shared';
 import { pool } from './db/client.ts';
 import { Partitioners } from 'kafkajs';
+
+const logger = createLogger('health');
 
 async function main() {
     const redis = await createRedis();
@@ -12,6 +20,7 @@ async function main() {
 
     const app = express();
     app.use(express.json());
+    app.use(requestContextMiddleware);
 
     app.get('/health', async (req, res) => {
         const [postgres, redisStatus, kafka] = await Promise.all([
@@ -37,7 +46,7 @@ async function main() {
 
     const port = process.env.HEALTH_SERVICE_PORT ?? 3001;
     const server = app.listen(port, () => {
-        console.log(`health started on port ${port}`);
+        logger.info({ port }, 'started');
     });
 
     registerShutdown(

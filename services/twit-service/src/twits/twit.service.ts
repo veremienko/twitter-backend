@@ -7,10 +7,11 @@ import {
     type RedisClient,
     HttpError,
     PaginationSchema,
+    requestContext,
 } from '@twitter/shared';
 import { db } from '../db/client.ts';
 import { twits, type Twit, likes, outbox } from '../db/schema.ts';
-import { requestContext } from '../app.ts';
+import { logger } from '../logger.ts';
 
 const CACHE_KEY = 'twits:all';
 const CACHE_TTL_SECONDS = 30;
@@ -99,9 +100,9 @@ export class TwitService {
             ]);
         } catch (error) {
             degraded = true;
-            console.error(
-                'user-service unavailable, serving feed without author names:',
+            logger.error(
                 error,
+                'Unavailable, serving feed without author names',
             );
         }
 

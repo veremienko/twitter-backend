@@ -2,6 +2,7 @@ import type { Producer } from 'kafkajs';
 import { eq, isNull } from 'drizzle-orm';
 import { outbox } from '../db/schema.ts';
 import { db } from '../db/client.ts';
+import { logger } from '../logger.ts';
 
 /** Poll unsent outbox rows and publish them to Kafka, marking each as sent. */
 export const startOutboxRelay = (producer: Producer) => {
@@ -24,7 +25,7 @@ export const startOutboxRelay = (producer: Producer) => {
                         {
                             headers: {
                                 eventId: String(row.id),
-                                requestId: row.requestId,
+                                requestId: row.requestId ?? undefined,
                             },
                             value: row.payload,
                         },
@@ -35,7 +36,7 @@ export const startOutboxRelay = (producer: Producer) => {
                     .set({ sentAt: new Date() })
                     .where(eq(outbox.id, row.id));
             } catch (error) {
-                console.error('Outbox relay tick failed:', error);
+                logger.error({ err: error }, 'outbox relay tick failed');
             }
         })();
     }, 1000);

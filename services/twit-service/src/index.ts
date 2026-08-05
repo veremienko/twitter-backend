@@ -1,9 +1,15 @@
-import { createKafka, createRedis, registerShutdown } from '@twitter/shared';
+import {
+    createKafka,
+    createLogger,
+    createRedis,
+    registerShutdown,
+} from '@twitter/shared';
 import { TwitService } from './twits/twit.service.ts';
 import { Partitioners } from 'kafkajs';
 import { startOutboxRelay } from './outbox/relay.ts';
 import { db } from './db/client.ts';
 import { createApp } from './app.ts';
+import { logger } from './logger.ts';
 
 async function main() {
     const redis = await createRedis();
@@ -20,7 +26,7 @@ async function main() {
 
     const port = process.env.TWIT_SERVICE_PORT ?? 3002;
     const server = app.listen(port, () => {
-        console.log(`twit-service started on port ${port}`);
+        logger.info({ port }, 'service started');
     });
 
     registerShutdown(

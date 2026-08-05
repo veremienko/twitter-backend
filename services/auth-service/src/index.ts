@@ -1,4 +1,10 @@
-import { createRedis, internalAuth, registerShutdown } from '@twitter/shared';
+import {
+    createLogger,
+    createRedis,
+    internalAuth,
+    registerShutdown,
+    requestContextMiddleware,
+} from '@twitter/shared';
 import express from 'express';
 import { AuthService } from './auth/auth.service.ts';
 import { authController as authRouter } from './auth/auth.controller.ts';
@@ -6,13 +12,15 @@ import { authController as authRouter } from './auth/auth.controller.ts';
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN;
 if (!INTERNAL_TOKEN) throw new Error('INTERNAL_TOKEN env var is required');
 
+const logger = createLogger('auth-service');
+
 const main = async () => {
     const redis = await createRedis();
 
     const app = express();
 
     app.use(express.json());
-
+    app.use(requestContextMiddleware);
     app.use(internalAuth(INTERNAL_TOKEN));
 
     const authService = new AuthService(redis);
@@ -21,7 +29,7 @@ const main = async () => {
 
     const port = process.env.AUTH_SERVICE_PORT ?? 3003;
     const server = app.listen(port, () => {
-        console.log(`auth-service started on port ${port}`);
+        logger.info({ port }, 'service started');
     });
 
     registerShutdown(

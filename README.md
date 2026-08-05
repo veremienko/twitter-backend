@@ -21,6 +21,7 @@ client → api-gateway :3000 ─┬→ twit-service :3002 → PostgreSQL, Redis(
 Shared code (Kafka/Redis clients, topic names) lives in `packages/shared` and is imported as `@twitter/shared` via npm workspaces.
 
 Design patterns used across the services are catalogued in [docs/patterns.md](docs/patterns.md).
+Learning progress and remaining topics live in [docs/learning-roadmap.md](docs/learning-roadmap.md).
 
 ## Running
 
