@@ -7,7 +7,8 @@ export function healthRouter(healthService: HealthService): Router {
 
     router.get('/health', async (req, res) => {
         try {
-            await healthService.getHealth(res);
+            const { status, healthy } = await healthService.getHealth();
+            res.status(healthy ? 200 : 503).json(status);
         } catch (error) {
             sendError(res, error);
         }

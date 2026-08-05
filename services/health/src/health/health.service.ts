@@ -1,5 +1,4 @@
 import { pool } from '../db/client.ts';
-import type { Response } from 'express';
 import { producer } from '../db/producer.ts';
 import type { RedisClient } from '@twitter/shared';
 
@@ -10,7 +9,8 @@ export class HealthService {
         this.redis = redis;
     }
 
-    async getHealth(res: Response) {
+    /** Ping postgres, redis and kafka; report each status and overall health. */
+    async getHealth() {
         const [postgres, redisStatus, kafka] = await Promise.all([
             pool.query('SELECT 1').then(
                 () => 'ok',
@@ -29,6 +29,6 @@ export class HealthService {
         ]);
         const status = { postgres, redis: redisStatus, kafka };
         const healthy = Object.values(status).every((s) => s === 'ok');
-        res.status(healthy ? 200 : 503).json(status);
+        return { status, healthy };
     }
 }
