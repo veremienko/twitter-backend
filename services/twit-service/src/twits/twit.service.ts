@@ -10,6 +10,7 @@ import {
 } from '@twitter/shared';
 import { db } from '../db/client.ts';
 import { twits, type Twit, likes, outbox } from '../db/schema.ts';
+import { requestContext } from '../app.ts';
 
 const CACHE_KEY = 'twits:all';
 const CACHE_TTL_SECONDS = 30;
@@ -48,6 +49,8 @@ export class TwitService {
 
     /** Insert a twit and its twit.created outbox event in one transaction, then invalidate the cache. */
     async createTwit(data: unknown): Promise<Twit> {
+        const requestId =
+            requestContext.getStore()?.requestId ?? crypto.randomUUID();
         const { text, authorId } = parseBody(CreateTwitSchema, data);
         const result = await db.transaction(async (tx) => {
             const [twit] = await tx
@@ -62,6 +65,7 @@ export class TwitService {
             await tx.insert(outbox).values({
                 topic: TOPICS.TWIT_CREATED,
                 payload: JSON.stringify(twit),
+                requestId,
             });
             return twit;
         });

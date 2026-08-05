@@ -29,6 +29,20 @@
       "when": 1785828054875,
       "tag": "0003_bizarre_stingray",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785919769552,
+      "tag": "0004_majestic_argent",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785922226660,
+      "tag": "0005_fuzzy_shape",
+      "breakpoints": true
     }
   ]
 }

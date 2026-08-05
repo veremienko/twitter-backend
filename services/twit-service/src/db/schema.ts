@@ -25,6 +25,7 @@ export const outbox = pgTable('outbox', {
     payload: text().notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     sentAt: timestamp('sent_at'),
+    requestId: text('request_id'),
 });
 
 export type Twit = typeof twits.$inferSelect;

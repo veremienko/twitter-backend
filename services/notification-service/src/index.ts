@@ -21,6 +21,8 @@ async function main() {
     await consumer.run({
         eachMessage: async ({ message }) => {
             const eventId = message.headers?.eventId?.toString();
+            const requestId = message.headers?.requestId?.toString();
+
             if (!eventId) {
                 console.warn(
                     'Message without eventId, processing without dedup',
@@ -31,14 +33,16 @@ async function main() {
                     EX: 60 * 60 * 24 * 7,
                 });
                 if (!isNew) {
-                    console.log(`Skipping duplicate event ${eventId}`);
+                    console.log(
+                        `[${requestId}] Skipping duplicate event ${eventId}`,
+                    );
                     return;
                 }
             }
 
             const twit = JSON.parse(message.value!.toString());
             console.log(
-                `Notification: new twit #${twit.id} by ${twit.authorId}: "${twit.text}"`,
+                `[${requestId}] Notification: new twit #${twit.id} by ${twit.authorId}: "${twit.text}"`,
             );
         },
     });

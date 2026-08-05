@@ -8,7 +8,11 @@ export async function forward(res: Response, url: string, init?: RequestInit) {
     try {
         const response = await fetch(url, {
             ...init,
-            headers: { 'x-internal-token': INTERNAL_TOKEN!, ...init?.headers },
+            headers: {
+                'x-request-id': res.locals.requestId,
+                'x-internal-token': INTERNAL_TOKEN!,
+                ...init?.headers,
+            },
             signal: AbortSignal.timeout(5000),
         });
         for (const cookie of response.headers.getSetCookie()) {

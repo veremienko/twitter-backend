@@ -1,0 +1,1 @@
+ALTER TABLE "outbox" RENAME COLUMN "requestId" TO "request_id";

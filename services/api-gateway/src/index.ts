@@ -8,6 +8,13 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
+app.use((req, res, next) => {
+    const requestId =
+        req.headers['x-request-id']?.toString() ?? crypto.randomUUID();
+    res.locals.requestId = requestId;
+    res.setHeader('x-request-id', requestId); // клієнт бачить id — зручно для скарг "запит упав"
+    next();
+});
 
 app.use('/api', apiRouter);
 

@@ -22,7 +22,10 @@ export const startOutboxRelay = (producer: Producer) => {
                     topic: row.topic,
                     messages: [
                         {
-                            headers: { eventId: String(row.id) },
+                            headers: {
+                                eventId: String(row.id),
+                                requestId: row.requestId,
+                            },
                             value: row.payload,
                         },
                     ],
