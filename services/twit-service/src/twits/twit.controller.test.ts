@@ -43,7 +43,7 @@ describe('twit controller', () => {
         await db.$client.end();
     });
 
-    function createTwit(text:string){
+    function createTwit(text: string) {
         return fetch(`${baseUrl}/twits`, {
             method: 'POST',
             headers: {
@@ -54,7 +54,7 @@ describe('twit controller', () => {
             body: JSON.stringify({
                 text,
             }),
-        })
+        });
     }
 
     it('creates a twit and responds 201', async () => {
@@ -150,9 +150,9 @@ describe('twit controller', () => {
             },
         });
         const body1 = await res1.json();
-        const ids1 = body1.map((item: { id: number; }) => item.id);
+        const ids1 = body1.map((item: { id: number }) => item.id);
         const body2 = await res2.json();
-        const ids2 = body2.map((item: { id: number; }) => item.id);
+        const ids2 = body2.map((item: { id: number }) => item.id);
         assert.notDeepEqual(ids1, ids2);
     });
 
