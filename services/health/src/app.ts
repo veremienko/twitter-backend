@@ -1,5 +1,9 @@
 import express from 'express';
-import { metricsHandler, requestContextMiddleware } from '@twitter/shared';
+import {
+    httpMetricsMiddleware,
+    metricsHandler,
+    requestContextMiddleware,
+} from '@twitter/shared';
 import { HealthService } from './health/health.service.ts';
 import { healthRouter } from './health/health.controller.ts';
 
@@ -8,6 +12,7 @@ export const createApp = (healthService: HealthService) => {
 
     app.use(express.json());
     app.use(requestContextMiddleware);
+    app.use(httpMetricsMiddleware('health'));
     app.get('/metrics', metricsHandler);
     app.use(healthRouter(healthService));
 

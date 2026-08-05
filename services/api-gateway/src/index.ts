@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import apiRouter from './routes/index.ts';
 import {
     createLogger,
+    httpMetricsMiddleware,
     metricsHandler,
     registerShutdown,
     requestContextMiddleware,
@@ -24,8 +25,9 @@ app.use((req, res, next) => {
     requestContextMiddleware(req, res, next);
 });
 
-app.use('/api', apiRouter);
+app.use(httpMetricsMiddleware('api-gateway'));
 app.get('/metrics', metricsHandler);
+app.use('/api', apiRouter);
 
 const port = process.env.GATEWAY_PORT ?? 3000;
 const server = app.listen(port, () => {

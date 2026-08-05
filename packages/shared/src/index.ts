@@ -25,4 +25,9 @@ export { createLogger } from './logger.ts';
 
 export { registerShutdown } from './shutdown.ts';
 
-export { metricsHandler } from './prometheus.ts';
+export {
+    metricsHandler,
+    httpRequestsTotal,
+    httpRequestDuration,
+    httpMetricsMiddleware,
+} from './prometheus.ts';

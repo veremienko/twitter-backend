@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+    httpMetricsMiddleware,
     internalAuth,
     metricsHandler,
     requestContextMiddleware,
@@ -15,6 +16,7 @@ export const createApp = (usersService: UsersService) => {
 
     app.use(express.json());
     app.use(requestContextMiddleware);
+    app.use(httpMetricsMiddleware('user-service'));
     app.get('/metrics', metricsHandler);
     app.use(internalAuth(INTERNAL_TOKEN));
     app.use('/', usersRouter(usersService));
