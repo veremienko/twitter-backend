@@ -68,7 +68,7 @@
       хендли (чому раннер/процес «не завершується»), unhandled rejection вбиває
       процес, `node --watch` і його зависання
 
-### Observability (в процесі)
+### Observability
 
 - [x] **Request-id наскрізь** — народжується в gateway (або приходить від
       клієнта), `AsyncLocalStorage` замість прокидання параметрами, переживає
@@ -76,7 +76,9 @@
 - [x] **pino** — структуровані JSON-логи, фабрика в shared, `mixin()` +
       AsyncLocalStorage підмішують requestId автоматично, access-log через
       `res.on('finish')`, pino-pretty у dev / сирий JSON у проді
-- [ ] **Метрики** — event loop lag, лічильники запитів, `/metrics` для Prometheus
+- [x] **Метрики** — prom-client: default-метрики + Counter/Histogram у middleware,
+      кардинальність лейблів (шаблон роута, не URL), Prometheus + Grafana в compose,
+      таргет-лейбли з `honor_labels`, PromQL (`rate`, `histogram_quantile`)
 
 ## Попереду (в рекомендованому порядку)
 
