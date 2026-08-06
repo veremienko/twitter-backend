@@ -65,7 +65,7 @@ services:
         ports:
             - '127.0.0.1:9090:9090'
         volumes:
-            -   ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+            - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
         develop:
             watch:
                 - action: sync+restart

@@ -8,6 +8,8 @@ import {
     HttpError,
     PaginationSchema,
     requestContext,
+    decodeCursor,
+    encodeCursor,
 } from '@twitter/shared';
 import { db } from '../db/client.ts';
 import { twits, type Twit, likes, outbox } from '../db/schema.ts';
@@ -76,20 +78,33 @@ export class TwitService {
     }
 
     /** List twits with author names, newest first, cached in Redis for a short time. */
-    async getTwits(data: unknown): Promise<TwitWithAuthor[]> {
-        const { limit, offset } = parseBody(PaginationSchema, data);
+    async getTwits(data: unknown): Promise<{
+        items: TwitWithAuthor[];
+        nextCursor?: string;
+    }> {
+        let { limit, nextCursor } = parseBody(PaginationSchema, data);
 
-        const paginated = limit !== undefined && offset !== undefined;
-
-        if (!paginated) {
+        if (!limit) {
             const cached = await this.redis.get(CACHE_KEY);
-            if (cached) return JSON.parse(cached);
+            if (cached)
+                return {
+                    items: JSON.parse(cached),
+                };
         }
 
-        const query = db.select().from(twits).orderBy(desc(twits.createdAt));
-        const result = paginated
-            ? await query.limit(limit).offset(offset)
-            : await query;
+        const after = nextCursor ? decodeCursor(nextCursor) : undefined;
+
+        const query = db.select().from(twits);
+        const result = limit
+            ? await query
+                  .limit(limit)
+                  .where(
+                      after
+                          ? sql`(${twits.createdAt}, ${twits.id}) < (${after.createdAt}, ${after.id})`
+                          : undefined,
+                  )
+                  .orderBy(desc(twits.createdAt), desc(twits.id))
+            : await query.orderBy(desc(twits.createdAt));
 
         let names = new Map<number, string>();
         let degraded = false;
@@ -110,12 +125,23 @@ export class TwitService {
             ...twit,
             authorName: names.get(twit.authorId) ?? null,
         }));
-        if (!degraded && !paginated) {
+        if (!degraded && !limit) {
             await this.redis.set(CACHE_KEY, JSON.stringify(enriched), {
                 EX: CACHE_TTL_SECONDS,
             });
         }
-        return enriched;
+
+        if (limit) {
+            const lastTwit = enriched[result.length - 1];
+            if (lastTwit) {
+                nextCursor = encodeCursor({
+                    id: lastTwit.id,
+                    createdAt: lastTwit.createdAt.toISOString(),
+                });
+            }
+        }
+
+        return { items: enriched, nextCursor };
     }
 
     async postLike(data: unknown): Promise<Twit> {

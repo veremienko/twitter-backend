@@ -107,7 +107,7 @@ describe('twit controller', () => {
             },
         });
         const body = await res.json();
-        assert.equal(body.length, 3);
+        assert.equal(body.items.length, 3);
     });
 
     it('responds the first page for offset=0', async () => {
@@ -124,7 +124,7 @@ describe('twit controller', () => {
             },
         });
         const body = await res.json();
-        assert.equal(body.length, 2);
+        assert.equal(body.items.length, 2);
     });
 
     it('responds a different page for offset=2', async () => {
@@ -150,9 +150,9 @@ describe('twit controller', () => {
             },
         });
         const body1 = await res1.json();
-        const ids1 = body1.map((item: { id: number }) => item.id);
+        const ids1 = body1.items.map((item: { id: number }) => item.id);
         const body2 = await res2.json();
-        const ids2 = body2.map((item: { id: number }) => item.id);
+        const ids2 = body2.items.map((item: { id: number }) => item.id);
         assert.notDeepEqual(ids1, ids2);
     });
 

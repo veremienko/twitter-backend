@@ -145,8 +145,11 @@ export const openApiDocument = {
                     'Twits newest first, enriched with author names. Cached in Redis for 30s, so a fresh twit may take a moment to appear.',
                 responses: {
                     200: json('The feed.', {
-                        type: 'array',
-                        items: ref('FeedTwit'),
+                        type: 'object',
+                        properties: {
+                            items: { type: 'array', items: ref('FeedTwit') },
+                            nextCursor: { type:'string', examples: ['eyJpZCI6OSwiY3JlYXRlZEF0IjoiMjAyNi0wOC0wNlQxMjowMjo0Ny45NjFaIn0'] }
+                        },
                     }),
                     401: error('No or expired session.'),
                     502: badGateway,
