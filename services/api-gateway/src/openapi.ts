@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
     CredentialsSchema,
     NewTwitSchema,
+    PaginationSchema,
     RegistrationSchema,
 } from '@twitter/shared';
 
@@ -29,6 +30,16 @@ const body = (schema: z.ZodType) => ({
     required: true,
     content: { 'application/json': { schema: requestSchema(schema) } },
 });
+
+/**
+ * One field of a zod object contract, reused as a parameter schema so bounds
+ * like limit's 1..100 stay in step with validation. `.refine()` rules have no
+ * JSON Schema equivalent and are dropped here, so any rule spanning two
+ * parameters has to be stated in their descriptions.
+ */
+const paramSchema = (schema: z.ZodType, field: string) =>
+    (requestSchema(schema) as { properties: Record<string, object> })
+        .properties[field];
 
 /** `{ error }` as produced by sendError in @twitter/shared. */
 const error = (description: string) => json(description, ref('Error'));
@@ -141,16 +152,53 @@ export const openApiDocument = {
                 tags: ['twits'],
                 summary: 'Feed',
                 operationId: 'getTwits',
-                description:
-                    'Twits newest first, enriched with author names. Cached in Redis for 30s, so a fresh twit may take a moment to appear.',
+                description: [
+                    'Twits newest first, enriched with author names.',
+                    '',
+                    'Without `limit` the whole feed comes back in one response, cached in Redis',
+                    'for 30s — so a fresh twit may take a moment to appear. With `limit` the feed',
+                    'is paginated by keyset: send `nextCursor` back as the `x-cursor` header to get',
+                    'the following page, and stop when `items` is empty. Unlike offset pagination',
+                    'a cursor is anchored to a row, so twits posted between two reads never shift',
+                    'a page and cause a duplicate.',
+                ].join('\n'),
+                parameters: [
+                    {
+                        name: 'limit',
+                        in: 'query',
+                        required: false,
+                        description:
+                            'Page size. Omit for the whole feed; required whenever `x-cursor` is sent.',
+                        schema: paramSchema(PaginationSchema, 'limit'),
+                    },
+                    {
+                        name: 'x-cursor',
+                        in: 'header',
+                        required: false,
+                        description:
+                            'The `nextCursor` of the previous page. Requires `limit` — on its own it is a 400, because it would otherwise be ignored and return the entire feed.',
+                        schema: paramSchema(PaginationSchema, 'nextCursor'),
+                    },
+                ],
                 responses: {
                     200: json('The feed.', {
                         type: 'object',
                         properties: {
                             items: { type: 'array', items: ref('FeedTwit') },
-                            nextCursor: { type:'string', examples: ['eyJpZCI6OSwiY3JlYXRlZEF0IjoiMjAyNi0wOC0wNlQxMjowMjo0Ny45NjFaIn0'] }
+                            nextCursor: {
+                                type: 'string',
+                                description:
+                                    'Absent on an unpaginated feed and once the feed is exhausted.',
+                                examples: [
+                                    'eyJpZCI6OSwiY3JlYXRlZEF0IjoiMjAyNi0wOC0wNlQxMjowMjo0Ny45NjFaIn0',
+                                ],
+                            },
                         },
+                        required: ['items'],
                     }),
+                    400: error(
+                        'limit is out of the 1..100 range, x-cursor was sent without limit, or the cursor is malformed.',
+                    ),
                     401: error('No or expired session.'),
                     502: badGateway,
                 },

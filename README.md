@@ -113,12 +113,32 @@ served from the same origin as the API, so the authenticated endpoints work righ
 | POST   | /api/register           | —      | register `{email, password, name, age, sex}`          |
 | POST   | /api/login              | —      | login, sets `sid` cookie                              |
 | POST   | /api/logout             | —      | deletes the session, clears the cookie                |
-| GET    | /api/twits              | cookie | twit feed                                             |
+| GET    | /api/twits              | cookie | twit feed, `{items, nextCursor}` — see below          |
 | POST   | /api/twits              | cookie | create a twit `{text}`; author comes from the session |
 | POST   | /api/twits/:twitId/like | cookie | like a twit, once per user; bumps the counter         |
 | GET    | /api/health             | —      | infrastructure status                                 |
 | GET    | /api/docs               | —      | Swagger UI                                            |
 | GET    | /api/openapi.json       | —      | OpenAPI 3.1 spec                                      |
+
+### Feed pagination (keyset)
+
+`GET /api/twits` always answers `{ items, nextCursor }`. Without `limit` it returns the whole
+feed (cached in Redis for 30s) and no cursor. With `limit` it returns one page plus the
+`nextCursor` to continue from; pass it back in the **`x-cursor` header** for the next page:
+
+```bash
+curl -b cookies.txt 'http://localhost:3000/api/twits?limit=20'
+curl -b cookies.txt 'http://localhost:3000/api/twits?limit=20' -H "x-cursor: $NEXT"
+```
+
+An exhausted feed answers `items: []`. A cursor without `limit` is `400` (it would otherwise be
+silently ignored and return everything), and a malformed cursor is `400` too.
+
+The cursor is base64url of `{id, createdAt}` — the last row of the page. The query seeks with
+`(created_at, id) < (cursor.created_at, cursor.id)`, so unlike `offset` it cannot drift when a
+twit is posted between two reads. `ORDER BY created_at DESC, id DESC` needs `id` as a
+tiebreaker to make the sort key unique, and `twits_created_at_id_idx` mirrors that ordering
+exactly (including `NULLS FIRST`) so Postgres seeks instead of sorting.
 
 ## Tools
 
