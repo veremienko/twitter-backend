@@ -3,7 +3,12 @@ export type { Producer, Consumer } from 'kafkajs';
 export { createRedis, type RedisClient } from './redis.ts';
 export { TOPICS } from './topics.ts';
 export { HttpError, sendError, internalAuth, parseBody } from './http.ts';
-export { NewUserSchema, type NewUser } from './contracts/users.ts';
+export {
+    NewUserSchema,
+    AVATAR_MAX_BYTES,
+    AVATAR_MIME_TYPES,
+    type NewUser,
+} from './contracts/users.ts';
 export {
     CredentialsSchema,
     RegistrationSchema,

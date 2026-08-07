@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+    AVATAR_MAX_BYTES,
+    AVATAR_MIME_TYPES,
     CredentialsSchema,
     NewTwitSchema,
     PaginationSchema,
@@ -68,6 +70,7 @@ export const openApiDocument = {
         { name: 'auth', description: 'registration and sessions' },
         { name: 'twits', description: 'feed and posting' },
         { name: 'ops', description: 'infrastructure status' },
+        { name: 'users', description: 'profiles and avatars' },
     ],
     paths: {
         '/health': {
@@ -244,6 +247,63 @@ export const openApiDocument = {
                 },
             },
         },
+        '/avatar': {
+            post: {
+                tags: ['users'],
+                summary: 'Upload an avatar',
+                operationId: 'uploadAvatar',
+                description: [
+                    'Replaces the avatar of the logged-in user; the owner comes from the session,',
+                    `never from the request. Send one file part named \`avatar\`, at most ${
+                        AVATAR_MAX_BYTES / 1024 / 1024
+                    } MB,`,
+                    `as ${AVATAR_MIME_TYPES.join(', ')}.`,
+                    '',
+                    'The body is never buffered: it is parsed and forwarded to object storage while',
+                    'it arrives, so an oversized upload is cut off mid-transfer rather than after the',
+                    'last byte, and the connection may be closed before the error response is read.',
+                ].join('\n'),
+                requestBody: {
+                    required: true,
+                    content: {
+                        'multipart/form-data': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    avatar: {
+                                        type: 'string',
+                                        format: 'binary',
+                                    },
+                                },
+                                required: ['avatar'],
+                            },
+                            encoding: {
+                                avatar: {
+                                    contentType: AVATAR_MIME_TYPES.join(', '),
+                                },
+                            },
+                        },
+                    },
+                },
+                responses: {
+                    200: json(
+                        'Stored, and the profile now points at it.',
+                        ref('Avatar'),
+                    ),
+                    400: error(
+                        'The body carries no `avatar` part, or the file is empty.',
+                    ),
+                    401: error('No or expired session.'),
+                    413: error(
+                        `The file is larger than ${AVATAR_MAX_BYTES / 1024 / 1024} MB.`,
+                    ),
+                    415: error(
+                        'The leading bytes of the file are not a supported image. The declared Content-Type is ignored, so a mislabelled file is rejected here even when the header looks right.',
+                    ),
+                    502: badGateway,
+                },
+            },
+        },
     },
     components: {
         securitySchemes: {
@@ -313,6 +373,22 @@ export const openApiDocument = {
                         required: ['authorName'],
                     },
                 ],
+            },
+            Avatar: {
+                type: 'object',
+                properties: {
+                    url: {
+                        type: 'string',
+                        description: [
+                            'Where to read the image back, through the gateway and behind the same',
+                            'session cookie. The path is derived from the user id, so it stays the',
+                            'same after every upload — a client that caches it has to revalidate',
+                            'rather than trust the URL to change.',
+                        ].join(' '),
+                        examples: ['/api/users/1/avatar'],
+                    },
+                },
+                required: ['url'],
             },
         },
     },
