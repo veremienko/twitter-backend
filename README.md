@@ -119,6 +119,7 @@ served from the same origin as the API, so the authenticated endpoints work righ
 | GET    | /api/health             | —      | infrastructure status                                 |
 | GET    | /api/docs               | —      | Swagger UI                                            |
 | GET    | /api/openapi.json       | —      | OpenAPI 3.1 spec                                      |
+| POST   | /api/avatar             | —      | Upload profile avatar                                 |
 
 ### Feed pagination (keyset)
 

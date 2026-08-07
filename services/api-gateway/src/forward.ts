@@ -5,8 +5,17 @@ import { logger } from 'twit-service/src/logger.ts';
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN;
 if (!INTERNAL_TOKEN) throw new Error('INTERNAL_TOKEN env var is required');
 
-/** Forward a request to a downstream service and mirror its response. */
-export async function forward(res: Response, url: string, init?: RequestInit) {
+/**
+ * Forward a request to a downstream service and mirror its response.
+ *
+ * `duplex` is absent from the DOM `RequestInit` TypeScript resolves here, but
+ * undici demands it whenever the body is a stream, so it is added by hand.
+ */
+export async function forward(
+    res: Response,
+    url: string,
+    init?: RequestInit & { duplex?: 'half' },
+) {
     const requestId =
         requestContext.getStore()?.requestId ?? crypto.randomUUID();
     try {
@@ -17,7 +26,7 @@ export async function forward(res: Response, url: string, init?: RequestInit) {
                 'x-internal-token': INTERNAL_TOKEN!,
                 ...init?.headers,
             },
-            signal: AbortSignal.timeout(5000),
+            signal: init?.signal ?? AbortSignal.timeout(5000),
         });
         for (const cookie of response.headers.getSetCookie()) {
             res.append('set-cookie', cookie);

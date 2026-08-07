@@ -270,15 +270,15 @@ export const openApiDocument = {
                             schema: {
                                 type: 'object',
                                 properties: {
-                                    avatar: {
+                                    file: {
                                         type: 'string',
                                         format: 'binary',
                                     },
                                 },
-                                required: ['avatar'],
+                                required: ['file'],
                             },
                             encoding: {
-                                avatar: {
+                                file: {
                                     contentType: AVATAR_MIME_TYPES.join(', '),
                                 },
                             },

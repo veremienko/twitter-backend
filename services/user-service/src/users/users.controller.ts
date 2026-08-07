@@ -33,5 +33,19 @@ export function usersRouter(usersService: UsersService): Router {
         }
     });
 
+    router.post('/avatar', async (req, res) => {
+        try {
+            res.status(200).json(
+                await usersService.uploadAvatar(
+                    req.headers['x-user-id'],
+                    req,
+                    req.headers,
+                ),
+            );
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
     return router;
 }
