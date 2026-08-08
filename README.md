@@ -108,17 +108,80 @@ services validate with (`packages/shared/src/contracts/`), so they cannot drift 
 `POST /api/login` through _Try it out_ leaves the `sid` cookie in the browser — the docs are
 served from the same origin as the API, so the authenticated endpoints work right after it.
 
-| Method | Path                    | Auth   | Description                                           |
-| ------ | ----------------------- | ------ | ----------------------------------------------------- |
-| POST   | /api/register           | —      | register `{email, password, name, age, sex}`          |
-| POST   | /api/login              | —      | login, sets `sid` cookie                              |
-| POST   | /api/logout             | —      | deletes the session, clears the cookie                |
-| GET    | /api/twits              | cookie | twit feed                                             |
-| POST   | /api/twits              | cookie | create a twit `{text}`; author comes from the session |
-| POST   | /api/twits/:twitId/like | cookie | like a twit, once per user; bumps the counter         |
-| GET    | /api/health             | —      | infrastructure status                                 |
-| GET    | /api/docs               | —      | Swagger UI                                            |
-| GET    | /api/openapi.json       | —      | OpenAPI 3.1 spec                                      |
+| Method | Path                      | Auth   | Description                                              |
+| ------ | ------------------------- | ------ | -------------------------------------------------------- |
+| POST   | /api/register             | —      | register `{email, password, name, age, sex}`             |
+| POST   | /api/login                | —      | login, sets `sid` cookie                                 |
+| POST   | /api/logout               | —      | deletes the session, clears the cookie                   |
+| GET    | /api/twits                | cookie | twit feed, `{items, nextCursor}` — see below             |
+| POST   | /api/twits                | cookie | create a twit `{text}`; author comes from the session    |
+| POST   | /api/twits/:twitId/like   | cookie | like a twit, once per user; bumps the counter            |
+| POST   | /api/avatar               | cookie | upload an avatar as `file`; owner comes from the session |
+| GET    | /api/users/:userId/avatar | cookie | the stored image, streamed back                          |
+| GET    | /api/health               | —      | infrastructure status                                    |
+| GET    | /api/docs                 | —      | Swagger UI                                               |
+| GET    | /api/openapi.json         | —      | OpenAPI 3.1 spec                                         |
+
+### Avatar uploads (streaming)
+
+The image is never buffered and never touches a disk. It travels
+browser → gateway → user-service → MinIO as one stream, and the checks happen
+while it flows rather than after it lands:
+
+- **413** — busboy caps the part at `AVATAR_MAX_BYTES` and the transfer is cut
+  off mid-flight, not measured at the end. Busboy signals this by truncating and
+  emitting `limit`, which on its own would store a broken image and answer
+  `200`, so the event is turned into a destroyed stream.
+- **415** — the type comes from the first twelve bytes, never from the
+  `Content-Type` the client wrote. That header is filled in from the file
+  extension, so a renamed executable arrives labelled `image/png`.
+- The object key is `String(userId)`, so an upload overwrites in place. That is
+  what makes the missing atomicity between S3 and Postgres harmless: a failed
+  database write leaves an object the next attempt replaces, never an orphan.
+- `users.avatar` stores the **media type**, not the key — the key is derivable,
+  the type is not, and a non-null value doubles as "has an avatar".
+
+#### Still missing
+
+Known gaps, in the order they are worth closing:
+
+- **No way to remove an avatar.** There is no `DELETE`, and deleting a user
+  leaves the object behind — the bucket only ever grows. A `DELETE` route plus a
+  cleanup on user deletion closes both halves.
+- **No caching headers.** `GET` answers a full body every time; with a URL that
+  never changes, an `ETag` and a `304` would cut almost all of that traffic.
+  Note the trap the `Avatar` schema already warns about: the path stays the same
+  after an upload, so a bare `Cache-Control: max-age` would pin the old image.
+- **No resize.** Whatever the client sends is what everyone downloads — a 5 MB
+  photo is served as a 5 MB photo. This is the next roadmap item (`sharp` in a
+  worker thread) and it lands exactly on this pipeline.
+- **Reads are gated by a session but not by ownership.** Any logged-in user can
+  fetch any user's avatar. That matches a public profile picture; if avatars
+  ever stop being public, the check belongs in the gateway route.
+- **A read hits Postgres before S3.** The row is only consulted for the media
+  type. Storing that type on the object at upload time would make the read a
+  single call — but it cannot be set from a stream of unknown length, which is
+  why it lives in the column for now.
+
+### Feed pagination (keyset)
+
+`GET /api/twits` always answers `{ items, nextCursor }`. Without `limit` it returns the whole
+feed (cached in Redis for 30s) and no cursor. With `limit` it returns one page plus the
+`nextCursor` to continue from; pass it back in the **`x-cursor` header** for the next page:
+
+```bash
+curl -b cookies.txt 'http://localhost:3000/api/twits?limit=20'
+curl -b cookies.txt 'http://localhost:3000/api/twits?limit=20' -H "x-cursor: $NEXT"
+```
+
+An exhausted feed answers `items: []`. A cursor without `limit` is `400` (it would otherwise be
+silently ignored and return everything), and a malformed cursor is `400` too.
+
+The cursor is base64url of `{id, createdAt}` — the last row of the page. The query seeks with
+`(created_at, id) < (cursor.created_at, cursor.id)`, so unlike `offset` it cannot drift when a
+twit is posted between two reads. `ORDER BY created_at DESC, id DESC` needs `id` as a
+tiebreaker to make the sort key unique, and `twits_created_at_id_idx` mirrors that ordering
+exactly (including `NULLS FIRST`) so Postgres seeks instead of sorting.
 
 ## Tools
 

@@ -1,0 +1,1 @@
+CREATE INDEX "twits_created_at_id_idx" ON "twits" USING btree ("created_at" DESC NULLS LAST,"id" DESC NULLS LAST);

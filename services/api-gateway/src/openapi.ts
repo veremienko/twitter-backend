@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import {
+    AVATAR_MAX_BYTES,
+    AVATAR_MIME_TYPES,
     CredentialsSchema,
     NewTwitSchema,
+    PaginationSchema,
     RegistrationSchema,
 } from '@twitter/shared';
 
@@ -30,6 +33,16 @@ const body = (schema: z.ZodType) => ({
     content: { 'application/json': { schema: requestSchema(schema) } },
 });
 
+/**
+ * One field of a zod object contract, reused as a parameter schema so bounds
+ * like limit's 1..100 stay in step with validation. `.refine()` rules have no
+ * JSON Schema equivalent and are dropped here, so any rule spanning two
+ * parameters has to be stated in their descriptions.
+ */
+const paramSchema = (schema: z.ZodType, field: string) =>
+    (requestSchema(schema) as { properties: Record<string, object> })
+        .properties[field];
+
 /** `{ error }` as produced by sendError in @twitter/shared. */
 const error = (description: string) => json(description, ref('Error'));
 
@@ -57,6 +70,7 @@ export const openApiDocument = {
         { name: 'auth', description: 'registration and sessions' },
         { name: 'twits', description: 'feed and posting' },
         { name: 'ops', description: 'infrastructure status' },
+        { name: 'users', description: 'profiles and avatars' },
     ],
     paths: {
         '/health': {
@@ -141,13 +155,53 @@ export const openApiDocument = {
                 tags: ['twits'],
                 summary: 'Feed',
                 operationId: 'getTwits',
-                description:
-                    'Twits newest first, enriched with author names. Cached in Redis for 30s, so a fresh twit may take a moment to appear.',
+                description: [
+                    'Twits newest first, enriched with author names.',
+                    '',
+                    'Without `limit` the whole feed comes back in one response, cached in Redis',
+                    'for 30s — so a fresh twit may take a moment to appear. With `limit` the feed',
+                    'is paginated by keyset: send `nextCursor` back as the `x-cursor` header to get',
+                    'the following page, and stop when `items` is empty. Unlike offset pagination',
+                    'a cursor is anchored to a row, so twits posted between two reads never shift',
+                    'a page and cause a duplicate.',
+                ].join('\n'),
+                parameters: [
+                    {
+                        name: 'limit',
+                        in: 'query',
+                        required: false,
+                        description:
+                            'Page size. Omit for the whole feed; required whenever `x-cursor` is sent.',
+                        schema: paramSchema(PaginationSchema, 'limit'),
+                    },
+                    {
+                        name: 'x-cursor',
+                        in: 'header',
+                        required: false,
+                        description:
+                            'The `nextCursor` of the previous page. Requires `limit` — on its own it is a 400, because it would otherwise be ignored and return the entire feed.',
+                        schema: paramSchema(PaginationSchema, 'nextCursor'),
+                    },
+                ],
                 responses: {
                     200: json('The feed.', {
-                        type: 'array',
-                        items: ref('FeedTwit'),
+                        type: 'object',
+                        properties: {
+                            items: { type: 'array', items: ref('FeedTwit') },
+                            nextCursor: {
+                                type: 'string',
+                                description:
+                                    'Absent on an unpaginated feed and once the feed is exhausted.',
+                                examples: [
+                                    'eyJpZCI6OSwiY3JlYXRlZEF0IjoiMjAyNi0wOC0wNlQxMjowMjo0Ny45NjFaIn0',
+                                ],
+                            },
+                        },
+                        required: ['items'],
                     }),
+                    400: error(
+                        'limit is out of the 1..100 range, x-cursor was sent without limit, or the cursor is malformed.',
+                    ),
                     401: error('No or expired session.'),
                     502: badGateway,
                 },
@@ -189,6 +243,108 @@ export const openApiDocument = {
                     401: error('No or expired session.'),
                     404: error('Twit not found.'),
                     409: error('You already liked this twit.'),
+                    502: badGateway,
+                },
+            },
+        },
+        '/avatar': {
+            post: {
+                tags: ['users'],
+                summary: 'Upload an avatar',
+                operationId: 'uploadAvatar',
+                description: [
+                    'Replaces the avatar of the logged-in user; the owner comes from the session,',
+                    `never from the request. Send one file part named \`file\`, at most ${
+                        AVATAR_MAX_BYTES / 1024 / 1024
+                    } MB,`,
+                    `as ${AVATAR_MIME_TYPES.join(', ')}.`,
+                    '',
+                    'The body is never buffered: it is parsed and forwarded to object storage while',
+                    'it arrives, so an oversized upload is cut off mid-transfer rather than after the',
+                    'last byte, and the connection may be closed before the error response is read.',
+                ].join('\n'),
+                requestBody: {
+                    required: true,
+                    content: {
+                        'multipart/form-data': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    file: {
+                                        type: 'string',
+                                        format: 'binary',
+                                    },
+                                },
+                                required: ['file'],
+                            },
+                            encoding: {
+                                file: {
+                                    contentType: AVATAR_MIME_TYPES.join(', '),
+                                },
+                            },
+                        },
+                    },
+                },
+                responses: {
+                    200: json(
+                        'Stored, and the profile now points at it.',
+                        ref('Avatar'),
+                    ),
+                    400: error(
+                        'The body is not multipart, carries no `file` part, or the file is empty.',
+                    ),
+                    401: error('No or expired session.'),
+                    404: error(
+                        'The session points at a user that no longer exists.',
+                    ),
+                    413: error(
+                        `The file is larger than ${AVATAR_MAX_BYTES / 1024 / 1024} MB.`,
+                    ),
+                    415: error(
+                        'The leading bytes of the file are not a supported image. The declared Content-Type is ignored, so a mislabelled file is rejected here even when the header looks right.',
+                    ),
+                    502: badGateway,
+                },
+            },
+        },
+        '/users/{userId}/avatar': {
+            get: {
+                tags: ['users'],
+                summary: 'Read an avatar',
+                operationId: 'getAvatar',
+                description: [
+                    'Serves the stored image. The path never changes for a given user, so a',
+                    'client that caches it has to revalidate rather than expect a new URL after',
+                    'an upload.',
+                    '',
+                    'The media type is the one sniffed from the bytes when they were stored, not',
+                    'the one the uploader claimed.',
+                ].join('\n'),
+                parameters: [
+                    {
+                        name: 'userId',
+                        in: 'path',
+                        required: true,
+                        schema: { type: 'integer', minimum: 1, examples: [1] },
+                    },
+                ],
+                responses: {
+                    200: {
+                        description: 'The image, streamed from object storage.',
+                        content: Object.fromEntries(
+                            AVATAR_MIME_TYPES.map((type) => [
+                                type,
+                                {
+                                    schema: {
+                                        type: 'string',
+                                        format: 'binary',
+                                    },
+                                },
+                            ]),
+                        ),
+                    },
+                    401: error('No or expired session.'),
+                    404: error('No such user, or the user has no avatar.'),
                     502: badGateway,
                 },
             },
@@ -262,6 +418,22 @@ export const openApiDocument = {
                         required: ['authorName'],
                     },
                 ],
+            },
+            Avatar: {
+                type: 'object',
+                properties: {
+                    url: {
+                        type: 'string',
+                        description: [
+                            'Where to read the image back, through the gateway and behind the same',
+                            'session cookie. The path is derived from the user id, so it stays the',
+                            'same after every upload — a client that caches it has to revalidate',
+                            'rather than trust the URL to change.',
+                        ].join(' '),
+                        examples: ['/api/users/1/avatar'],
+                    },
+                },
+                required: ['url'],
             },
         },
     },

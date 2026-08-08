@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sendError } from '@twitter/shared';
+import { sendError, encodeCursor } from '@twitter/shared';
 import type { TwitService } from './twit.service.ts';
 
 export function twitRouter(twitService: TwitService): Router {
@@ -19,7 +19,10 @@ export function twitRouter(twitService: TwitService): Router {
 
     router.get('/twits', async (req, res) => {
         try {
-            const result = await twitService.getTwits(req.query);
+            const result = await twitService.getTwits({
+                ...req.query,
+                nextCursor: req.headers['x-cursor'],
+            });
             res.status(200).json(result);
         } catch (error) {
             sendError(res, error);

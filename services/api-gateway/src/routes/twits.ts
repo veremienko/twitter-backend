@@ -11,7 +11,11 @@ twitsRouter.get('/twits', requireAuth, async (req, res) => {
     const queryString = new URLSearchParams(
         req.query as Record<string, string>,
     ).toString();
-    await forward(res, `${TWIT_SERVICE_URL}/twits?${queryString}`);
+
+    const cursor = req.headers['x-cursor'];
+    await forward(res, `${TWIT_SERVICE_URL}/twits?${queryString}`, {
+        headers: typeof cursor === 'string' ? { 'x-cursor': cursor } : {},
+    });
 });
 twitsRouter.post('/twits', requireAuth, async (req, res) => {
     await forward(res, `${TWIT_SERVICE_URL}/twits`, {

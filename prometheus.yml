@@ -1,22 +1,22 @@
 global:
-  scrape_interval: 15s
+    scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'twitter-backend'
-    honor_labels: true
-    static_configs:
-      - targets: ['host.docker.internal:3000']
-        labels:
-          service: api-gateway
-      - targets: ['host.docker.internal:3001']
-        labels:
-          service: health
-      - targets: ['host.docker.internal:3002']
-        labels:
-          service: twit-service
-      - targets: ['host.docker.internal:3003']
-        labels:
-          service: auth-service
-      - targets: ['host.docker.internal:3004']
-        labels:
-          service: user-service
+    - job_name: 'twitter-backend'
+      honor_labels: true
+      static_configs:
+          - targets: ['host.docker.internal:3000']
+            labels:
+                service: api-gateway
+          - targets: ['host.docker.internal:3001']
+            labels:
+                service: health
+          - targets: ['host.docker.internal:3002']
+            labels:
+                service: twit-service
+          - targets: ['host.docker.internal:3003']
+            labels:
+                service: auth-service
+          - targets: ['host.docker.internal:3004']
+            labels:
+                service: user-service

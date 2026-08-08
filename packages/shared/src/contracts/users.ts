@@ -14,3 +14,12 @@ export const NewUserSchema = z.object({
 });
 
 export type NewUser = z.infer<typeof NewUserSchema>;
+
+/**
+ * Avatar limits. The upload is streamed, so nothing here can be checked against
+ * a whole file: the size is enforced by busboy while the bytes flow (and the
+ * upload is aborted the moment it is exceeded), and the type by the leading
+ * bytes of the stream — never by the Content-Type the client claims.
+ */
+export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+export const AVATAR_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];

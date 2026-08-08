@@ -7,6 +7,7 @@ export const users = pgTable('users', {
     name: text().notNull(),
     age: integer().notNull(),
     sex: text({ enum: ['male', 'female'] }).notNull(),
+    avatar: text(),
 });
 
 export type User = typeof users.$inferSelect;
