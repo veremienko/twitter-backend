@@ -254,7 +254,7 @@ export const openApiDocument = {
                 operationId: 'uploadAvatar',
                 description: [
                     'Replaces the avatar of the logged-in user; the owner comes from the session,',
-                    `never from the request. Send one file part named \`avatar\`, at most ${
+                    `never from the request. Send one file part named \`file\`, at most ${
                         AVATAR_MAX_BYTES / 1024 / 1024
                     } MB,`,
                     `as ${AVATAR_MIME_TYPES.join(', ')}.`,
@@ -291,15 +291,60 @@ export const openApiDocument = {
                         ref('Avatar'),
                     ),
                     400: error(
-                        'The body carries no `avatar` part, or the file is empty.',
+                        'The body is not multipart, carries no `file` part, or the file is empty.',
                     ),
                     401: error('No or expired session.'),
+                    404: error(
+                        'The session points at a user that no longer exists.',
+                    ),
                     413: error(
                         `The file is larger than ${AVATAR_MAX_BYTES / 1024 / 1024} MB.`,
                     ),
                     415: error(
                         'The leading bytes of the file are not a supported image. The declared Content-Type is ignored, so a mislabelled file is rejected here even when the header looks right.',
                     ),
+                    502: badGateway,
+                },
+            },
+        },
+        '/users/{userId}/avatar': {
+            get: {
+                tags: ['users'],
+                summary: 'Read an avatar',
+                operationId: 'getAvatar',
+                description: [
+                    'Serves the stored image. The path never changes for a given user, so a',
+                    'client that caches it has to revalidate rather than expect a new URL after',
+                    'an upload.',
+                    '',
+                    'The media type is the one sniffed from the bytes when they were stored, not',
+                    'the one the uploader claimed.',
+                ].join('\n'),
+                parameters: [
+                    {
+                        name: 'userId',
+                        in: 'path',
+                        required: true,
+                        schema: { type: 'integer', minimum: 1, examples: [1] },
+                    },
+                ],
+                responses: {
+                    200: {
+                        description: 'The image, streamed from object storage.',
+                        content: Object.fromEntries(
+                            AVATAR_MIME_TYPES.map((type) => [
+                                type,
+                                {
+                                    schema: {
+                                        type: 'string',
+                                        format: 'binary',
+                                    },
+                                },
+                            ]),
+                        ),
+                    },
+                    401: error('No or expired session.'),
+                    404: error('No such user, or the user has no avatar.'),
                     502: badGateway,
                 },
             },

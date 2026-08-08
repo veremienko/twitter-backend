@@ -34,7 +34,27 @@ jobs:
             - run: npm ci
             - run: cp .env.example .env
             - run: npx prettier --check .
+            # Not a `services:` entry: the MinIO image needs `server /data` to
+            # start, and service containers cannot be given a command. The
+            # bucket is left to `ensureBucket` — the same code path production
+            # uses on a cold volume.
+            - name: Start MinIO
+              run: |
+                  docker run -d --name minio -p 9000:9000 \
+                    -e MINIO_ROOT_USER=admin \
+                    -e MINIO_ROOT_PASSWORD=admin123 \
+                    minio/minio:latest server /data
+                  for i in $(seq 1 30); do
+                    curl -sf http://localhost:9000/minio/health/live && exit 0
+                    sleep 2
+                  done
+                  echo 'MinIO did not become healthy' >&2
+                  docker logs minio
+                  exit 1
             - run: |
-                  cd services/twit-service                                                                                                                                                                             
+                  cd services/twit-service
+                  DATABASE_URL=postgres://twitter:twitter@localhost:5432/twitter_test npx drizzle-kit migrate
+            - run: |
+                  cd services/user-service
                   DATABASE_URL=postgres://twitter:twitter@localhost:5432/twitter_test npx drizzle-kit migrate
             - run: npm test

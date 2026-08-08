@@ -47,5 +47,25 @@ export function usersRouter(usersService: UsersService): Router {
         }
     });
 
+    /**
+     * Serve the image itself. The response is piped rather than sent, so the
+     * bytes leave for the client as they arrive from storage — the same
+     * discipline the upload follows, in the opposite direction.
+     */
+    router.get('/users/:userId/avatar', async (req, res) => {
+        try {
+            const { contentType, stream } = await usersService.getAvatar(
+                req.params.userId,
+            );
+            res.status(200).type(contentType);
+            // A failure after the first byte cannot become a status code, so
+            // the only honest answer left is to break the connection.
+            stream.on('error', () => res.destroy());
+            stream.pipe(res);
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
     return router;
 }

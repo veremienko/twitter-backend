@@ -88,10 +88,21 @@
       кардинальність лейблів (шаблон роута, не URL), Prometheus + Grafana в compose,
       таргет-лейбли з `honor_labels`, PromQL (`rate`, `histogram_quantile`)
 
-## Попереду (в рекомендованому порядку)
+### Streams і файли
 
-- [ ] **Streams і файли** — завантаження аватарок: multipart, `pipeline()`,
-      backpressure, MinIO у compose (найбільша суто Node-тема)
+- [x] **Аватарки потоком** — multipart через busboy, `pipeline()` замість `.pipe()`
+      (передає помилки і прибирає ланцюг), backpressure як умова того, що 5 МБ
+      не осідають у пам'яті, MinIO у compose + `@aws-sdk/lib-storage`.
+      Граблі, кожна з яких коштувала окремої діагностики: gateway мусить
+      прокидати `content-type` дослівно, інакше губиться boundary; busboy емітить
+      `limit` **синхронно**, ще до першого читання, тому обробник треба вішати в
+      колбеку `'file'`, а не після `await`; `part.destroy()` кидає `error`
+      раніше, ніж `pipeline` встигає підключитися, — рятує порожній слухач плюс
+      `part.errored`; непрочитана чужа частина стопорить парсер; `limits.files:1`
+      з'їдається першою-ліпшою частиною, тож друга не долітає; сніф мусить
+      віддавати **накопичене**, а не поточний чанк, інакше зникає заголовок
+      картинки; `Readable.toWeb` не тайпиться проти undici — колізія двох
+      описів web-потоків у `@types/node`
 - [ ] **Worker threads** — ресайз зображень через sharp, демонстрація
       блокування event loop
 - [ ] **Real-time: SSE/WebSockets** — notification-service шле в браузер,

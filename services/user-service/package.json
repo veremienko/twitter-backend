@@ -6,7 +6,8 @@
     "scripts": {
         "dev": "node --watch --env-file=../../.env src/index.ts",
         "db:generate": "drizzle-kit generate",
-        "db:migrate": "drizzle-kit migrate"
+        "db:migrate": "drizzle-kit migrate",
+        "test": "node --env-file=../../.env --env-file=.env.test --test --test-concurrency=1"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.1105.0",
