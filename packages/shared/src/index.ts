@@ -7,6 +7,8 @@ export {
     NewUserSchema,
     AVATAR_MAX_BYTES,
     AVATAR_MIME_TYPES,
+    AVATAR_MAX_DIMENSION,
+    AVATAR_OUTPUT_MIME,
     type NewUser,
 } from './contracts/users.ts';
 export {

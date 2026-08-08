@@ -1,14 +1,16 @@
 import busboy from 'busboy';
 import type { IncomingHttpHeaders } from 'node:http';
-import { PassThrough, Transform, type Readable } from 'node:stream';
+import { PassThrough, Transform, Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import {
     AVATAR_MAX_BYTES,
+    AVATAR_MAX_DIMENSION,
     AVATAR_MIME_TYPES,
     HttpError,
 } from '@twitter/shared';
 import { uploadStream } from './client.ts';
 import { SNIFF_BYTES, acceptedImageType } from './image-type.ts';
+import sharp from 'sharp';
 
 /** The name of the multipart part the OpenAPI contract documents. */
 const FIELD = 'file';
@@ -46,6 +48,8 @@ export async function storeAvatar(
         pipeline(
             file,
             sniffImage((type) => (found.type = type)),
+            collectToBuffer(),
+            resize(),
             body,
         ),
         uploadStream(key, body),
@@ -216,3 +220,38 @@ const unsupported = () =>
         415,
         `Not a supported image; expected ${AVATAR_MIME_TYPES.join(', ')}`,
     );
+
+const collectToBuffer = () => {
+    let chunks: Buffer[] = [];
+
+    return new Transform({
+        transform(chunk: Buffer, _encoding, done) {
+            chunks.push(chunk);
+            done();
+        },
+        flush(done) {
+            done(null, Buffer.concat(chunks));
+        },
+    });
+};
+
+const resize = () => {
+    return new Transform({
+        transform(chunk: Buffer, _encoding, done) {
+            resizeAvatarBuffer(chunk)
+                .then((resized) => done(null, resized))
+                .catch(done);
+        },
+    });
+};
+
+const resizeAvatarBuffer = async (chunk: Buffer) => {
+    try {
+        return await sharp(chunk).resize(AVATAR_MAX_DIMENSION).webp().toBuffer();
+    } catch (err) {
+        throw new HttpError(
+            400,
+            err instanceof Error ? err.message : 'Failed to resize avatar',
+        );
+    }
+};

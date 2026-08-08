@@ -23,3 +23,5 @@ export type NewUser = z.infer<typeof NewUserSchema>;
  */
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 export const AVATAR_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const AVATAR_MAX_DIMENSION = 256;
+export const AVATAR_OUTPUT_MIME = 'image/webp';
