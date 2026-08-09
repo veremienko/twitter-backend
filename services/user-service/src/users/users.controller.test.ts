@@ -3,18 +3,41 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { sql } from 'drizzle-orm';
-import { AVATAR_MAX_BYTES } from '@twitter/shared';
+import {
+    AVATAR_MAX_BYTES,
+    AVATAR_MAX_DIMENSION,
+    AVATAR_OUTPUT_MIME,
+} from '@twitter/shared';
 import { db } from '../db/client.ts';
 import { createApp } from '../app.ts';
 import { UsersService } from './users.service.ts';
 import { bucket, client, ensureBucket } from '../storage/client.ts';
 import { DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import sharp from 'sharp';
 
+/**
+ * Real magic, filler for a body — enough to pass the sniff, not enough for
+ * sharp to decode. Only good for requests expected to fail before `resize()`
+ * would ever run; a request expected to succeed needs `pngImage` instead.
+ */
 const png = (size = 64) =>
     Buffer.concat([
         Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
         Buffer.alloc(Math.max(0, size - 8), 0x2a),
     ]);
+
+/** A real, decodable PNG for requests that are expected to go through `resize()`. */
+const pngImage = (width: number, height = width) =>
+    sharp({
+        create: {
+            width,
+            height,
+            channels: 3,
+            background: { r: 200, g: 30, b: 30 },
+        },
+    })
+        .png()
+        .toBuffer();
 
 describe('users controller: avatars', () => {
     let server: http.Server;
@@ -102,7 +125,7 @@ describe('users controller: avatars', () => {
     it('uploads an avatar and answers with the URL to read it back', async () => {
         const id = await createUser();
 
-        const res = await uploadAvatar(id, png());
+        const res = await uploadAvatar(id, await pngImage(64));
 
         assert.equal(res.status, 200);
         assert.deepEqual(await res.json(), {
@@ -110,16 +133,20 @@ describe('users controller: avatars', () => {
         });
     });
 
-    it('serves the image back with the type sniffed on the way in', async () => {
+    it('serves the image back re-encoded to the output type', async () => {
         const id = await createUser();
-        const original = png(2048);
-        await uploadAvatar(id, original);
+        await uploadAvatar(id, await pngImage(600, 400));
 
         const res = await getAvatar(id);
 
         assert.equal(res.status, 200);
-        assert.equal(res.headers.get('content-type'), 'image/png');
-        assert.deepEqual(Buffer.from(await res.arrayBuffer()), original);
+        assert.equal(res.headers.get('content-type'), AVATAR_OUTPUT_MIME);
+
+        const meta = await sharp(
+            Buffer.from(await res.arrayBuffer()),
+        ).metadata();
+        assert.equal(meta.format, 'webp');
+        assert.equal(meta.width, AVATAR_MAX_DIMENSION);
     });
 
     /**
@@ -130,17 +157,18 @@ describe('users controller: avatars', () => {
         const first = await createUser('first@example.com');
         const second = await createUser('second@example.com');
 
-        await uploadAvatar(first, png(64));
-        await uploadAvatar(second, png(256));
+        await uploadAvatar(first, await pngImage(300, 150));
+        await uploadAvatar(second, await pngImage(150, 300));
 
-        assert.equal(
-            (await (await getAvatar(first)).arrayBuffer()).byteLength,
-            64,
-        );
-        assert.equal(
-            (await (await getAvatar(second)).arrayBuffer()).byteLength,
-            256,
-        );
+        const firstMeta = await sharp(
+            Buffer.from(await (await getAvatar(first)).arrayBuffer()),
+        ).metadata();
+        const secondMeta = await sharp(
+            Buffer.from(await (await getAvatar(second)).arrayBuffer()),
+        ).metadata();
+
+        assert.equal(firstMeta.height, AVATAR_MAX_DIMENSION / 2);
+        assert.equal(secondMeta.height, AVATAR_MAX_DIMENSION * 2);
     });
 
     it('responds 404 for a user that has no avatar yet', async () => {
@@ -197,22 +225,23 @@ describe('users controller: avatars', () => {
      * not look like a successful upload.
      */
     it('responds 404 when the uploader no longer exists', async () => {
-        const res = await uploadAvatar(9999, png());
+        const res = await uploadAvatar(9999, await pngImage(64));
         assert.equal(res.status, 404);
     });
 
     it('replaces the previous avatar rather than adding a second one', async () => {
         const id = await createUser();
-        await uploadAvatar(id, png(64));
-        await uploadAvatar(id, png(512));
+        await uploadAvatar(id, await pngImage(300, 150));
+        await uploadAvatar(id, await pngImage(150, 300));
 
         const listed = await client.send(
             new ListObjectsV2Command({ Bucket: bucket }),
         );
         assert.equal(listed.Contents?.length, 1);
-        assert.equal(
-            (await (await getAvatar(id)).arrayBuffer()).byteLength,
-            512,
-        );
+
+        const meta = await sharp(
+            Buffer.from(await (await getAvatar(id)).arrayBuffer()),
+        ).metadata();
+        assert.equal(meta.height, AVATAR_MAX_DIMENSION * 2);
     });
 });

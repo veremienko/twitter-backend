@@ -6,6 +6,7 @@ import {
     AVATAR_MAX_BYTES,
     AVATAR_MAX_DIMENSION,
     AVATAR_MIME_TYPES,
+    AVATAR_OUTPUT_MIME,
     HttpError,
 } from '@twitter/shared';
 import { uploadStream } from './client.ts';
@@ -19,7 +20,12 @@ const MAX_MB = AVATAR_MAX_BYTES / 1024 / 1024;
 
 /**
  * Parse one avatar out of a multipart body, stream it into object storage, and
- * report the media type its bytes turned out to be.
+ * report the media type it was stored as.
+ *
+ * The sniff only decides whether the input is one of the accepted formats;
+ * `resize()` re-encodes every accepted image to `AVATAR_OUTPUT_MIME` regardless
+ * of what came in, so that — not the sniffed input type — is what the object
+ * ends up as and what this function reports.
  *
  * Nothing is buffered beyond a twelve-byte peek: the bytes leave for storage as
  * they arrive, and a body that breaks a rule is cut off mid-transfer instead of
@@ -34,10 +40,9 @@ export async function storeAvatar(
 
     const file = await firstFilePart(parser, source);
 
-    // The type is only knowable once twelve bytes have arrived, which is after
-    // the upload has to have been started — so the sniff reports it sideways,
-    // and it is read back below, where the pipeline has certainly run.
-    const found: { type?: string } = {};
+    // Whether the sniff accepted the head. Read back below, where the pipeline
+    // has certainly run.
+    let sniffed = false;
 
     // `pipeline` feeds the upload and, on any failure along the chain, destroys
     // every stream in it — including this one, which is how the SDK learns to
@@ -47,7 +52,7 @@ export async function storeAvatar(
     await Promise.all([
         pipeline(
             file,
-            sniffImage((type) => (found.type = type)),
+            sniffImage(() => (sniffed = true)),
             collectToBuffer(),
             resize(),
             body,
@@ -57,8 +62,8 @@ export async function storeAvatar(
 
     // Unreachable unless the sniff accepted the head, which is the only way the
     // pipeline above can resolve.
-    if (!found.type) throw new Error('avatar stored without a known type');
-    return found.type;
+    if (!sniffed) throw new Error('avatar stored without a known type');
+    return AVATAR_OUTPUT_MIME;
 }
 
 /** Busboy throws when the body is not multipart at all; that is a client error. */
@@ -247,7 +252,14 @@ const resize = () => {
 
 const resizeAvatarBuffer = async (chunk: Buffer) => {
     try {
-        return await sharp(chunk).resize(AVATAR_MAX_DIMENSION).webp().toBuffer();
+        return await sharp(chunk)
+            .resize({
+                width: AVATAR_MAX_DIMENSION,
+                height: AVATAR_MAX_DIMENSION,
+                withoutEnlargement: true,
+            })
+            .webp()
+            .toBuffer();
     } catch (err) {
         throw new HttpError(
             400,
