@@ -28,6 +28,7 @@
     "include": [
         "packages/*/src",
         "services/*/src",
+        "services/*/playground",
         "services/*/drizzle.config.ts"
     ]
 }

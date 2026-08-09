@@ -103,16 +103,55 @@
       віддавати **накопичене**, а не поточний чанк, інакше зникає заголовок
       картинки; `Readable.toWeb` не тайпиться проти undici — колізія двох
       описів web-потоків у `@types/node`
-- [ ] **Worker threads** — ресайз зображень через sharp, демонстрація
-      блокування event loop
+- [x] **Worker threads** — ресайз зображень через sharp, демонстрація
+      блокування event loop: `perf_hooks.monitorEventLoopDelay` показав, що
+      сам sharp event loop не блокує (важка робота йде в libuv threadpool),
+      а синхронний `while`-цикл — блокує повністю (300мс блокування →
+      рівно 300мс `Max Lag`). Той самий блок, винесений у `worker_threads`,
+      головного потоку вже не чіпає (інший `threadId`). Граблі: Windows дає
+      таймеру грубість ~15.6мс — це шумова підлога вимірювання, тому
+      потрібен контрольний (свідомо блокуючий) тест, щоб довести, що
+      інструмент взагалі щось бачить; `setTimeout` всередині `while` ніколи
+      не спрацює — синхронний цикл сам не дає event loop дістатись до черги
+      таймерів; подвійний `histogram.reset()` перед виводом обнуляє
+      `Max Lag` до нуля ще до того, як його прочитали; `fileURLToPath` на
+      відносному рядку падає — `Worker` приймає `URL`, резолвити слід через
+      `new URL(rel, import.meta.url)`, бо в ESM немає `__dirname`;
+      кореневий `tsconfig.json` не бачив `playground/`, бо `include`
+      обмежений на `services/*/src`. Бонус: `nodejs_eventloop_lag_seconds`
+      вже збирається безкоштовно через `collectDefaultMetrics` у
+      `packages/shared/src/prometheus.ts` — не треба нічого писати, щоб
+      бачити лаг у Prometheus/Grafana.
 - [ ] **Real-time: SSE/WebSockets** — notification-service шле в браузер,
       довгоживучі з'єднання + graceful shutdown для них
 - [ ] **Rate limiting** — token bucket на Redis у gateway
 - [ ] **Кілька інстансів сервісу** — конкуренція relay за outbox
       (`FOR UPDATE SKIP LOCKED`), cache stampede, stateless-дизайн
 - [ ] **Process hardening** — глобальні `unhandledRejection`/`uncaughtException`
-- [ ] **Профілювання** — `--inspect`, heap snapshot, пошук memory leak,
-      event loop lag на живому сервісі
+- [x] **Профілювання** — `--inspect`, event loop lag на живому сервісі
+      (аватарки під конкурентним навантаженням). `chrome://inspect` →
+      Performance-панель (класичну "Profiler" і навіть "JavaScript
+      Profiler" з "More tools" у нових Chrome прибрали взагалі). Спосіб
+      довести, що знайдений у флейм-чарті блок — саме твій код: у стеку
+      мають бути власні файли (`avatar.ts`, `users.service.ts`,
+      `users.controller.ts`), а не здогад по часу. Головне відкриття:
+      `nodejs_eventloop_lag_max_seconds` (безкоштовний з
+      `collectDefaultMetrics`) скидається між скрейпами, а не тримає
+      lifetime-максимум — перевірено напряму через Prometheus HTTP API
+      (`/api/v1/query_range`), звірене по секундах з `process_start_time_seconds`
+      і з лічильником `http_requests_total`. Найбільший зафіксований сплеск
+      (~315мс) виявився не навантаженням, а холодним стартом самого
+      сервісу (перше підвантаження нативного sharp/libvips); дрібніші
+      сплески (52-245мс) точно збіглися в часі із запусками навантажувального
+      скрипта. У самому профілі це не один великий блокуючий виклик, а
+      купа дрібних синхронних задач підряд без пауз (парсинг HTTP,
+      серіалізація запиту в AWS SDK, `Buffer.concat` з `collectToBuffer`,
+      GC) — кожна на кілька мс, разом вони не лишають event loop вікна між
+      таймерами. Граблі: лейбл у `prometheus.yml` — `service`, не `job`
+      (усі таргети на одному job); лічильники `JS heap`/`Documents`/`Nodes`/
+      `Listeners`/`GPU memory` у Performance-панелі — браузерні DOM-поняття,
+      для чистого Node-процесу не працюють (heap-графік лишається
+      порожнім, "No memory usage data").
 - [ ] **Фінал: підписки + fan-out стрічки** — таблиця follows з лічильниками,
       fan-out on write vs on read — збирає разом усі попередні теми
 
