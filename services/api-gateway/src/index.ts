@@ -1,6 +1,7 @@
 import { createLogger, registerShutdown } from '@twitter/shared';
 import { redis } from './middleware.ts';
 import { createApp } from './app.ts';
+import { closeAllProxied, handleUpgrade } from './ws-proxy.ts';
 
 const logger = createLogger('api-gateway');
 
@@ -12,8 +13,11 @@ const main = async () => {
         logger.info({ port }, 'started');
     });
 
+    server.on('upgrade', handleUpgrade);
+
     registerShutdown(
         () => server.closeIdleConnections(),
+        () => closeAllProxied(),
         () => new Promise((resolve) => server.close(resolve)),
         () => redis.quit(),
     );

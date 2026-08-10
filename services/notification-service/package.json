@@ -7,6 +7,10 @@
         "dev": "node --watch --env-file=../../.env src/index.ts"
     },
     "dependencies": {
-        "@twitter/shared": "*"
+        "@twitter/shared": "*",
+        "ws": "^8.21.3"
+    },
+    "devDependencies": {
+        "@types/ws": "^8.18.1"
     }
 }

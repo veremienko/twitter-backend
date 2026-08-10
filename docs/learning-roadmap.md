@@ -122,8 +122,55 @@
       вже збирається безкоштовно через `collectDefaultMetrics` у
       `packages/shared/src/prometheus.ts` — не треба нічого писати, щоб
       бачити лаг у Prometheus/Grafana.
-- [ ] **Real-time: SSE/WebSockets** — notification-service шле в браузер,
-      довгоживучі з'єднання + graceful shutdown для них
+- [x] **Real-time: WebSockets** — обрано WS замість SSE (одностороннього
+      broadcast вистачило б, але WS змусив самому написати upgrade-проксі
+      через gateway). notification-service: голий `http.createServer()`
+      (Express там не було взагалі — тільки Kafka-консюмер) + `ws`
+      `WebSocketServer({ server, path: '/ws', verifyClient })`, де
+      `verifyClient` перевіряє `x-internal-token` — той самий internalAuth-
+      контракт, що й на звичайних роутах, тільки на етапі хендшейку.
+      `wss.clients` — готовий реєстр підключених, по ньому й `broadcast()`
+      при консюмінгу `TWIT_CREATED`. Gateway: `'upgrade'`-подія на сирому
+      `http.Server` повністю минає Express pipeline — жодна мідлвар
+      (включно з `requireAuth`) не спрацьовує, автентифікацію (кука `sid` →
+      Redis-сесія) довелось руками повторити в `'upgrade'`-хендлері.
+      Проксі — це два незалежні WS-з'єднання, які самостійно зшиваються:
+      `wss.handleUpgrade()` (`noServer: true`) приймає бравзерну ногу, і
+      лише після цього gateway сам, як клієнт, відкриває другу ногу до
+      notification-service з `x-internal-token` (бравзер такий заголовок
+      на хендшейку додати не може). Повідомлення від клієнта, що прийшли
+      до того, як upstream дійшов до `OPEN`, доводиться буферизувати в
+      черзі — `ws` кидає виняток на `send()` під час `CONNECTING`.
+      Graceful shutdown: `server.close()` чекає на всі з'єднання, а
+      upgraded WS-сокет ніколи не «idle» для `closeIdleConnections()` —
+      без окремого кроку, що явно закриває реєстр живих сокетів (свій
+      `Set` в gateway, `wss.clients` в notification-service) ДО
+      `server.close()`, shutdown просто висів би до 10-секундного
+      forced-exit. Граблі, кожна — окрема діагностика: `socket.emit(name,
+      data)` на сирому `ws`-сокеті нічого не шле по мережі — це звичайний
+      `EventEmitter`, `.emit()` лише локально викликає власні слухачі;
+      немає вбудованих «іменованих подій» як у Socket.IO, довелось
+      придумати свій конверт `{type, payload}` через JSON; `path`-міссматч
+      у `WebSocketServer({ path })` перевіряється РАНІШЕ за `verifyClient`
+      і відповідає 400, а не 401 — не там шукав причину (гнав на токен,
+      а бракувало `/ws` в кінці upstream-URL); клієнтський `ws` на не-101
+      відповідь хендшейку емітить `'unexpected-response'`, а не `'error'`,
+      і лише за відсутності слухача на цю подію падає назад в `'error'`
+      з `Unexpected server response: <code>` — саме цей fallback і
+      підказав реальні статуси; `localhost` і `127.0.0.1` — різні хости
+      для cookie-стору, кука з логіну на одному не долетить на WS-хендшейк
+      до іншого; `ECONNREFUSED` з gateway при живому напрямому конекті з
+      Postman на той самий `localhost:PORT` — Node (Happy Eyeballs)
+      резолвить `localhost` в IPv6 раніше за IPv4, а сервер слухає не ту
+      родину адрес — лікується явним `127.0.0.1` в internal URL;
+      `node:stream/iter` — неіснуючий модуль, і хибний імпорт валить увесь
+      процес ще на завантаженні ESM, до першого рядка коду; `new Set()`
+      без типу висновується як `Set<unknown>` — `.close()` на елементах не
+      типчекається, доки не написано явно `Set<WebSocket>`; одна зайва
+      літера в `docker-compose.yml` (`pgadmin_data:c` замість
+      `pgadmin_data:`) — невалідний YAML в секції `volumes`, і через це
+      `docker compose` не піднімає взагалі нічого, не тільки те, що
+      редагувалось.
 - [ ] **Rate limiting** — token bucket на Redis у gateway
 - [ ] **Кілька інстансів сервісу** — конкуренція relay за outbox
       (`FOR UPDATE SKIP LOCKED`), cache stampede, stateless-дизайн

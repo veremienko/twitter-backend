@@ -8,10 +8,18 @@ import {
     TOPICS,
 } from '@twitter/shared';
 
+import { createServer } from 'http';
+import { createWsServer } from './ws.ts';
+import { readFileSync } from 'fs';
+
 const logger = createLogger('notification-service');
 
 const main = async () => {
     const redis = await createRedis();
+
+    const app = createServer();
+
+    const ws = createWsServer(app);
 
     const kafka = createKafka('notification-service');
     await ensureTopics(kafka, [TOPICS.TWIT_CREATED]);
@@ -50,6 +58,9 @@ const main = async () => {
                     }
 
                     const twit = JSON.parse(message.value!.toString());
+
+                    ws.broadcast(JSON.stringify(twit));
+
                     logger.info(
                         {
                             eventId,
@@ -63,9 +74,19 @@ const main = async () => {
             );
         },
     });
+
     logger.info({ topic: TOPICS.TWIT_CREATED }, 'Consuming topic');
 
+    const port = process.env.NOTIFICATION_SERVICE_PORT ?? 8080;
+    const server = app.listen(port, () => {
+        logger.info({ port }, 'service started');
+    });
+
     registerShutdown(
+        () => server.closeIdleConnections(),
+        () => ws.closeAll(),
+        () => new Promise((resolve) => server.close(resolve)),
+        () => consumer.disconnect(),
         () => consumer.disconnect(),
         () => redis.quit(),
     );
