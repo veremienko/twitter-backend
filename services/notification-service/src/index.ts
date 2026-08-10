@@ -10,7 +10,6 @@ import {
 
 import { createServer } from 'http';
 import { createWsServer } from './ws.ts';
-import { readFileSync } from 'fs';
 
 const logger = createLogger('notification-service');
 

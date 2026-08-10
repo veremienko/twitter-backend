@@ -1,4 +1,4 @@
-import type { Server } from 'node:http';
+import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer } from 'ws';
 
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN;
@@ -14,7 +14,7 @@ export function createWsServer(server: Server) {
     const wss = new WebSocketServer({
         server,
         path: '/ws',
-        verifyClient: (info) =>
+        verifyClient: (info: { req: IncomingMessage }) =>
             info.req.headers['x-internal-token'] === INTERNAL_TOKEN,
     });
 
