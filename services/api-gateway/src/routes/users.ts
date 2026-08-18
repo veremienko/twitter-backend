@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { forward, forwardStream } from '../forward.ts';
-import { requireAuth } from '../middleware.ts';
+import { requireAuth, writeRateLimiter } from '../middleware.ts';
 import { Readable } from 'node:stream';
 
 const USER_SERVICE_URL =
@@ -11,7 +11,7 @@ const UPLOAD_TIMEOUT_MS = 30_000;
 
 const userRouter = Router();
 
-userRouter.post('/avatar', requireAuth, async (req, res) => {
+userRouter.post('/avatar', requireAuth, writeRateLimiter, async (req, res) => {
     await forward(res, `${USER_SERVICE_URL}/avatar`, {
         method: 'POST',
         headers: {
