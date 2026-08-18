@@ -50,4 +50,29 @@ export const outbox = pgTable('outbox', {
     requestId: text('request_id'),
 });
 
+/**
+ * Fan-out-on-write home feed: one row per (follower, twit), populated at
+ * `createTwit` time for every follower the author had at that moment. Reading
+ * it is then a plain indexed lookup by follower — the cost of fan-out was
+ * already paid on write, unlike the `/feed/on-read` alternative that joins
+ * against `follows` ids at read time instead of maintaining this table.
+ */
+export const homeFeed = pgTable(
+    'home_feed',
+    {
+        id: integer().primaryKey().generatedAlwaysAsIdentity(),
+        followerId: integer('follower_id').notNull(),
+        twitId: integer('twit_id').notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+    },
+    // Same keyset-pagination shape as twits_created_at_id_idx, scoped per follower.
+    (t) => [
+        index('home_feed_follower_created_at_id_idx').on(
+            t.followerId,
+            t.createdAt.desc().nullsFirst(),
+            t.id.desc().nullsFirst(),
+        ),
+    ],
+);
+
 export type Twit = typeof twits.$inferSelect;

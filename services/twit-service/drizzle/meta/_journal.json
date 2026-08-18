@@ -57,6 +57,13 @@
       "when": 1786021971027,
       "tag": "0007_sloppy_mystique",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787079017563,
+      "tag": "0008_typical_meltdown",
+      "breakpoints": true
     }
   ]
 }

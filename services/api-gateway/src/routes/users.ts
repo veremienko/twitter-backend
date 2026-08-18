@@ -36,4 +36,22 @@ userRouter.get('/users/:userId/avatar', requireAuth, async (req, res) => {
     );
 });
 
+userRouter.post('/follows', requireAuth, async (req, res) => {
+    await forward(res, `${USER_SERVICE_URL}/follows`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            'x-user-id': res.locals.userId,
+        },
+        body: JSON.stringify(req.body),
+    });
+});
+
+userRouter.delete('/follows/:followeeId', requireAuth, async (req, res) => {
+    await forward(res, `${USER_SERVICE_URL}/follows/${req.params.followeeId}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': res.locals.userId },
+    });
+});
+
 export default userRouter;

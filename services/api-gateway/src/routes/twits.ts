@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { forward } from '../forward.ts';
 import { requireAuth } from '../middleware.ts';
 
@@ -38,5 +38,24 @@ twitsRouter.post('/twits/:twitId/like', requireAuth, async (req, res) => {
         body: JSON.stringify(req.body),
     });
 });
+
+/** Forwards a feed read: query string, caller identity, and the cursor header. */
+function forwardFeed(path: string) {
+    return async (req: Request, res: Response) => {
+        const queryString = new URLSearchParams(
+            req.query as Record<string, string>,
+        ).toString();
+        const cursor = req.headers['x-cursor'];
+        await forward(res, `${TWIT_SERVICE_URL}${path}?${queryString}`, {
+            headers: {
+                'x-user-id': res.locals.userId,
+                ...(typeof cursor === 'string' ? { 'x-cursor': cursor } : {}),
+            },
+        });
+    };
+}
+
+twitsRouter.get('/feed/home', requireAuth, forwardFeed('/feed/home'));
+twitsRouter.get('/feed/on-read', requireAuth, forwardFeed('/feed/on-read'));
 
 export default twitsRouter;

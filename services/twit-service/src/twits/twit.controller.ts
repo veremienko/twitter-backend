@@ -41,5 +41,33 @@ export function twitRouter(twitService: TwitService): Router {
         }
     });
 
+    /** Fan-out-on-write: precomputed per-follower feed. */
+    router.get('/feed/home', async (req, res) => {
+        try {
+            const result = await twitService.getHomeFeed({
+                ...req.query,
+                userId: req.headers['x-user-id'],
+                nextCursor: req.headers['x-cursor'],
+            });
+            res.status(200).json(result);
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
+    /** Fan-out-on-read: resolved from `follows` at read time, for comparison with /feed/home. */
+    router.get('/feed/on-read', async (req, res) => {
+        try {
+            const result = await twitService.getFeedOnRead({
+                ...req.query,
+                userId: req.headers['x-user-id'],
+                nextCursor: req.headers['x-cursor'],
+            });
+            res.status(200).json(result);
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
     return router;
 }

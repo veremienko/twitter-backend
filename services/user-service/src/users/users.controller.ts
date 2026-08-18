@@ -67,5 +67,51 @@ export function usersRouter(usersService: UsersService): Router {
         }
     });
 
+    router.post('/follows', async (req, res) => {
+        try {
+            await usersService.followUser({
+                followerId: req.headers['x-user-id'],
+                followeeId: req.body?.followeeId,
+            });
+            res.status(201).json({ ok: true });
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
+    router.delete('/follows/:followeeId', async (req, res) => {
+        try {
+            await usersService.unfollowUser({
+                followerId: req.headers['x-user-id'],
+                followeeId: req.params.followeeId,
+            });
+            res.status(204).send();
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
+    /** Internal: who follows this user — twit-service fans a new twit out to them on write. */
+    router.get('/users/:userId/followers/ids', async (req, res) => {
+        try {
+            res.status(200).json(
+                await usersService.getFollowerIds(req.params.userId),
+            );
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
+    /** Internal: who this user follows — twit-service's fan-out-on-read feed. */
+    router.get('/users/:userId/following/ids', async (req, res) => {
+        try {
+            res.status(200).json(
+                await usersService.getFollowingIds(req.params.userId),
+            );
+        } catch (error) {
+            sendError(res, error);
+        }
+    });
+
     return router;
 }

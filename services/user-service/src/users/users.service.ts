@@ -1,10 +1,10 @@
 import type { IncomingHttpHeaders } from 'node:http';
 import type { Readable } from 'node:stream';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { HttpError, NewUserSchema, parseBody } from '@twitter/shared';
 import { z } from 'zod';
 import { db } from '../db/client.ts';
-import { users } from '../db/schema.ts';
+import { follows, users } from '../db/schema.ts';
 import { storeAvatar } from '../storage/avatar.ts';
 import { readStream } from '../storage/client.ts';
 
@@ -29,6 +29,28 @@ const AvatarUserIdSchema = z.coerce
     .number({ error: 'userId is required' })
     .int()
     .positive();
+
+/** Same shape again, for the follower/following-ids path param. */
+const FollowUserIdSchema = z.coerce
+    .number({ error: 'userId is required' })
+    .int()
+    .positive();
+
+const FollowFieldsSchema = z.object({
+    followerId: z.coerce
+        .number({ error: 'x-user-id header is required' })
+        .int()
+        .positive(),
+    followeeId: z.coerce
+        .number({ error: 'followeeId is required' })
+        .int()
+        .positive(),
+});
+
+const FollowSchema = FollowFieldsSchema.refine(
+    (data) => data.followerId !== data.followeeId,
+    { message: 'cannot follow yourself', path: ['followeeId'] },
+);
 
 export class UsersService {
     /** Resolve public profiles (id, name) by ids; used by twit-service. */
@@ -131,6 +153,84 @@ export class UsersService {
             contentType: user.avatar,
             stream: await readStream(avatarKey(userId)),
         };
+    }
+
+    /**
+     * Insert the follow edge and bump both counters in one transaction — the
+     * same insert+counter pattern as `postLike`/`twits.likes`. 409 if the
+     * edge already exists (unique constraint as the invariant), 404 if the
+     * followee doesn't.
+     */
+    async followUser(data: unknown) {
+        const { followerId, followeeId } = parseBody(FollowSchema, data);
+        try {
+            await db.transaction(async (tx) => {
+                await tx.insert(follows).values({ followerId, followeeId });
+
+                const [followee] = await tx
+                    .update(users)
+                    .set({ followerCount: sql`${users.followerCount} + 1` })
+                    .where(eq(users.id, followeeId))
+                    .returning({ id: users.id });
+                if (!followee) throw new HttpError(404, 'User not found');
+
+                await tx
+                    .update(users)
+                    .set({ followingCount: sql`${users.followingCount} + 1` })
+                    .where(eq(users.id, followerId));
+            });
+        } catch (error) {
+            if (isUniqueViolation(error)) {
+                throw new HttpError(409, 'already following');
+            }
+            throw error;
+        }
+    }
+
+    /** Remove the follow edge and bump both counters back down; 404 if it wasn't there. */
+    async unfollowUser(data: unknown) {
+        const { followerId, followeeId } = parseBody(FollowFieldsSchema, data);
+        await db.transaction(async (tx) => {
+            const [deleted] = await tx
+                .delete(follows)
+                .where(
+                    and(
+                        eq(follows.followerId, followerId),
+                        eq(follows.followeeId, followeeId),
+                    ),
+                )
+                .returning({ id: follows.id });
+            if (!deleted) throw new HttpError(404, 'not following');
+
+            await tx
+                .update(users)
+                .set({ followerCount: sql`${users.followerCount} - 1` })
+                .where(eq(users.id, followeeId));
+            await tx
+                .update(users)
+                .set({ followingCount: sql`${users.followingCount} - 1` })
+                .where(eq(users.id, followerId));
+        });
+    }
+
+    /** Ids of everyone following this user; used by twit-service to fan out a new twit on write. */
+    async getFollowerIds(id: unknown): Promise<number[]> {
+        const userId = parseBody(FollowUserIdSchema, id);
+        const rows = await db
+            .select({ id: follows.followerId })
+            .from(follows)
+            .where(eq(follows.followeeId, userId));
+        return rows.map((row) => row.id);
+    }
+
+    /** Ids of everyone this user follows; used by twit-service's fan-out-on-read feed. */
+    async getFollowingIds(id: unknown): Promise<number[]> {
+        const userId = parseBody(FollowUserIdSchema, id);
+        const rows = await db
+            .select({ id: follows.followeeId })
+            .from(follows)
+            .where(eq(follows.followerId, userId));
+        return rows.map((row) => row.id);
     }
 }
 

@@ -39,6 +39,21 @@ twit-service збагачує стрічку іменами авторів че�
 user-service (`fetchAuthorNames` у `twit.service.ts`). Запит іде **батчем** — один
 на всі id, а не по одному на твіт (захист від N+1).
 
+### Fan-out on write vs on read
+
+`services/twit-service/src/twits/twit.service.ts`: `createTwit` (fan-out on
+write) вставляє по рядку в `home_feed` для кожного поточного фолловера автора
+— в тій самій транзакції, що й сам твіт. `getHomeFeed` потім читає готову
+таблицю простим індексованим запитом: вартість фан-ауту вже сплачена на
+запис. `getFeedOnRead` — протилежний підхід: жодної таблиці, `follows`
+резолвиться в user-service на кожен запит, `twits` фільтрується
+`WHERE author_id IN (...)`. Компроміс symmetричний: on-write дорожчий на
+запис (пропорційно кількості фолловерів) і живе своїм життям — збій
+user-service під час твіту губить лише фан-аут-рядок, сам твіт і
+`/feed/on-read` не постраждають; on-read нічого не коштує на запис, зате
+кожне читання залежить від user-service (503, якщо `following/ids`
+недоступний).
+
 ### Асинхронні події (pub/sub)
 
 twit-service публікує `twit.created` у Kafka, notification-service споживає
