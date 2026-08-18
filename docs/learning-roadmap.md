@@ -107,7 +107,17 @@
       блокування event loop
 - [ ] **Real-time: SSE/WebSockets** — notification-service шле в браузер,
       довгоживучі з'єднання + graceful shutdown для них
-- [ ] **Rate limiting** — token bucket на Redis у gateway
+- [x] **Rate limiting** — token bucket на Redis у gateway: `createRateLimiter`
+      у shared рахує `tokens`/`lastRefill` в один `EVAL` (Lua), а не парою
+      GET/SET — окремі команди гонять: два паралельних запити читають
+      "лишився 1 токен" до того, як хтось запише назад, і обидва проходять.
+      Лімітер підключений так само, як `requireAuth` — per-route, а не
+      глобально: авторизовані write-ендпоінти (`POST /twits`,
+      `/twits/:id/like`, `POST /avatar`) лімітуються за `userId`, `login`/
+      `register` (де сесії ще нема) — за IP. Стан живе в Redis, а не в
+      пам'яті процесу gateway, тому лічильник спільний навіть при кількох
+      інстансах gateway (без цього — грабля з PR "кілька інстансів": кожен
+      інстанс мав би свій ліміт, і реальна стеля була б `capacity × instances`).
 - [ ] **Кілька інстансів сервісу** — конкуренція relay за outbox
       (`FOR UPDATE SKIP LOCKED`), cache stampede, stateless-дизайн
 - [ ] **Process hardening** — глобальні `unhandledRejection`/`uncaughtException`

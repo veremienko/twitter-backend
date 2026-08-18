@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { forward } from '../forward.ts';
-import { requireAuth } from '../middleware.ts';
+import { requireAuth, writeRateLimiter } from '../middleware.ts';
 
 const TWIT_SERVICE_URL =
     process.env.TWIT_SERVICE_URL ?? 'http://localhost:3002';
@@ -17,7 +17,7 @@ twitsRouter.get('/twits', requireAuth, async (req, res) => {
         headers: typeof cursor === 'string' ? { 'x-cursor': cursor } : {},
     });
 });
-twitsRouter.post('/twits', requireAuth, async (req, res) => {
+twitsRouter.post('/twits', requireAuth, writeRateLimiter, async (req, res) => {
     await forward(res, `${TWIT_SERVICE_URL}/twits`, {
         method: 'POST',
         headers: {
@@ -28,15 +28,24 @@ twitsRouter.post('/twits', requireAuth, async (req, res) => {
     });
 });
 
-twitsRouter.post('/twits/:twitId/like', requireAuth, async (req, res) => {
-    await forward(res, `${TWIT_SERVICE_URL}/twits/${req.params.twitId}/like`, {
-        method: 'POST',
-        headers: {
-            'content-type': 'application/json',
-            'x-user-id': res.locals.userId,
-        },
-        body: JSON.stringify(req.body),
-    });
-});
+twitsRouter.post(
+    '/twits/:twitId/like',
+    requireAuth,
+    writeRateLimiter,
+    async (req, res) => {
+        await forward(
+            res,
+            `${TWIT_SERVICE_URL}/twits/${req.params.twitId}/like`,
+            {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-user-id': res.locals.userId,
+                },
+                body: JSON.stringify(req.body),
+            },
+        );
+    },
+);
 
 export default twitsRouter;

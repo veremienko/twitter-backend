@@ -41,3 +41,5 @@ export {
     httpRequestDuration,
     httpMetricsMiddleware,
 } from './prometheus.ts';
+
+export { createRateLimiter, type RateLimiterOptions } from './rate-limit.ts';
