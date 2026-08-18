@@ -194,7 +194,8 @@ services:
             context: .
             args:
                 SERVICE: twit-service
-        container_name: twitter-twit-service
+        # No fixed container_name: `--scale twit-service=N` needs Compose free
+        # to name each replica itself (twitter-backend-twit-service-1, -2, …).
         profiles: [app]
         environment:
             TWIT_SERVICE_PORT: 3002
