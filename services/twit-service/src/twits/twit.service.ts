@@ -17,6 +17,16 @@ import { logger } from '../logger.ts';
 
 const CACHE_KEY = 'twits:all';
 const CACHE_TTL_SECONDS = 30;
+
+// Cache stampede guard for CACHE_KEY: on a miss, only the request that wins
+// this lock recomputes (query + fetchAuthorNames) and writes the cache;
+// everyone else waits briefly for the winner instead of piling an identical
+// recompute on top. The lock's own TTL is the safety net if the winner dies
+// mid-recompute — a stuck lock would otherwise block every future miss.
+const STAMPEDE_LOCK_KEY = 'lock:twits:all';
+const STAMPEDE_LOCK_TTL_MS = 5000;
+const STAMPEDE_WAIT_MS = 50;
+const STAMPEDE_WAIT_ATTEMPTS = 3;
 const USER_SERVICE_URL =
     process.env.USER_SERVICE_URL ?? 'http://localhost:3004';
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN!;
@@ -84,64 +94,94 @@ export class TwitService {
     }> {
         let { limit, nextCursor } = parseBody(PaginationSchema, data);
 
+        let gotStampedeLock = false;
         if (!limit) {
             const cached = await this.redis.get(CACHE_KEY);
-            if (cached)
-                return {
-                    items: JSON.parse(cached),
-                };
-        }
+            if (cached) return { items: JSON.parse(cached) };
 
-        const after = nextCursor ? decodeCursor(nextCursor) : undefined;
-
-        const query = db.select().from(twits);
-        const result = limit
-            ? await query
-                  .limit(limit)
-                  .where(
-                      after
-                          ? sql`(${twits.createdAt}, ${twits.id}) < (${after.createdAt}, ${after.id})`
-                          : undefined,
-                  )
-                  .orderBy(desc(twits.createdAt), desc(twits.id))
-            : await query.orderBy(desc(twits.createdAt));
-
-        let names = new Map<number, string>();
-        let degraded = false;
-
-        try {
-            names = await fetchAuthorNames([
-                ...new Set(result.map((twit) => twit.authorId)),
-            ]);
-        } catch (error) {
-            degraded = true;
-            logger.error(
-                error,
-                'Unavailable, serving feed without author names',
+            gotStampedeLock = Boolean(
+                await this.redis.set(STAMPEDE_LOCK_KEY, '1', {
+                    NX: true,
+                    PX: STAMPEDE_LOCK_TTL_MS,
+                }),
             );
-        }
-
-        const enriched = result.map((twit) => ({
-            ...twit,
-            authorName: names.get(twit.authorId) ?? null,
-        }));
-        if (!degraded && !limit) {
-            await this.redis.set(CACHE_KEY, JSON.stringify(enriched), {
-                EX: CACHE_TTL_SECONDS,
-            });
-        }
-
-        if (limit) {
-            const lastTwit = enriched[result.length - 1];
-            if (lastTwit) {
-                nextCursor = encodeCursor({
-                    id: lastTwit.id,
-                    createdAt: lastTwit.createdAt.toISOString(),
-                });
+            if (!gotStampedeLock) {
+                const fromWinner = await this.waitForStampedeWinner();
+                if (fromWinner) return { items: fromWinner };
+                // The winner never finished in time (crashed mid-recompute,
+                // or is just slow) — fall through and read Postgres
+                // ourselves rather than block the request indefinitely.
             }
         }
 
-        return { items: enriched, nextCursor };
+        try {
+            const after = nextCursor ? decodeCursor(nextCursor) : undefined;
+
+            const query = db.select().from(twits);
+            const result = limit
+                ? await query
+                      .limit(limit)
+                      .where(
+                          after
+                              ? sql`(${twits.createdAt}, ${twits.id}) < (${after.createdAt}, ${after.id})`
+                              : undefined,
+                      )
+                      .orderBy(desc(twits.createdAt), desc(twits.id))
+                : await query.orderBy(desc(twits.createdAt));
+
+            let names = new Map<number, string>();
+            let degraded = false;
+
+            try {
+                names = await fetchAuthorNames([
+                    ...new Set(result.map((twit) => twit.authorId)),
+                ]);
+            } catch (error) {
+                degraded = true;
+                logger.error(
+                    error,
+                    'Unavailable, serving feed without author names',
+                );
+            }
+
+            const enriched = result.map((twit) => ({
+                ...twit,
+                authorName: names.get(twit.authorId) ?? null,
+            }));
+            if (!degraded && !limit && gotStampedeLock) {
+                await this.redis.set(CACHE_KEY, JSON.stringify(enriched), {
+                    EX: CACHE_TTL_SECONDS,
+                });
+            }
+
+            if (limit) {
+                const lastTwit = enriched[result.length - 1];
+                if (lastTwit) {
+                    nextCursor = encodeCursor({
+                        id: lastTwit.id,
+                        createdAt: lastTwit.createdAt.toISOString(),
+                    });
+                }
+            }
+
+            return { items: enriched, nextCursor };
+        } finally {
+            // Release right away rather than waiting out the full TTL, so a
+            // fast recompute doesn't make the next miss wait for no reason.
+            if (gotStampedeLock) await this.redis.del(STAMPEDE_LOCK_KEY);
+        }
+    }
+
+    /** Wait briefly for whoever holds the stampede lock to fill the cache. */
+    private async waitForStampedeWinner(): Promise<TwitWithAuthor[] | null> {
+        for (let attempt = 0; attempt < STAMPEDE_WAIT_ATTEMPTS; attempt++) {
+            await new Promise((resolve) =>
+                setTimeout(resolve, STAMPEDE_WAIT_MS),
+            );
+            const cached = await this.redis.get(CACHE_KEY);
+            if (cached) return JSON.parse(cached);
+        }
+        return null;
     }
 
     async postLike(data: unknown): Promise<Twit> {

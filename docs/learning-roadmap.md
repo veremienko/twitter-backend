@@ -108,8 +108,23 @@
 - [ ] **Real-time: SSE/WebSockets** — notification-service шле в браузер,
       довгоживучі з'єднання + graceful shutdown для них
 - [ ] **Rate limiting** — token bucket на Redis у gateway
-- [ ] **Кілька інстансів сервісу** — конкуренція relay за outbox
-      (`FOR UPDATE SKIP LOCKED`), cache stampede, stateless-дизайн
+- [x] **Кілька інстансів сервісу** — конкуренція relay за outbox
+      (`FOR UPDATE SKIP LOCKED`), cache stampede, stateless-дизайн.
+      Relay: select+update окремими запитами — реальна гонка, два інстанси
+      можуть узяти той самий unsent-рядок до того, як перший встигне
+      проставити `sent_at`, і відправити подію в Kafka двічі; фікс — обидва
+      кроки в одній транзакції з `FOR UPDATE SKIP LOCKED` (лок тримається,
+      поки триває і `producer.send`, — свідомий компроміс: довше тримаємо
+      конекшн, зате дублю не буває взагалі, а не лише ловимо його постфактум
+      ідемпотентним консюмером). Cache stampede: на промасі `twits:all`
+      лишень один запит бере Redis-лок (`SET NX PX`) і перераховує
+      (запит + `fetchAuthorNames`) і кладе кеш, решта чекають ~150мс і
+      перечитують кеш замість паралельного дубльованого перерахунку.
+      Stateless вже виконано існуючим кодом: сесії живуть у Redis
+      (`session:<sid>`), а не в пам'яті процесу gateway, тож будь-який
+      інстанс gateway однаково автентифікує той самий кукі. Грабля для
+      перевірки через `docker compose --profile app up --scale twit-service=2`:
+      `container_name` конфліктує зі scale — треба прибрати його з compose.
 - [ ] **Process hardening** — глобальні `unhandledRejection`/`uncaughtException`
 - [ ] **Профілювання** — `--inspect`, heap snapshot, пошук memory leak,
       event loop lag на живому сервісі
