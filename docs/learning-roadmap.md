@@ -110,7 +110,20 @@
 - [ ] **Rate limiting** — token bucket на Redis у gateway
 - [ ] **Кілька інстансів сервісу** — конкуренція relay за outbox
       (`FOR UPDATE SKIP LOCKED`), cache stampede, stateless-дизайн
-- [ ] **Process hardening** — глобальні `unhandledRejection`/`uncaughtException`
+- [x] **Process hardening** — глобальні `unhandledRejection`/`uncaughtException`:
+      обидва підписані в `registerShutdown` (shared) — це вже єдина точка,
+      яку викликають усі 5 сервісів у своїх `index.ts`, тож правка не
+      торкнулась жодного з них. Грабля: за замовчуванням Node на цих подіях
+      просто вбиває процес — жодного шансу закрити Kafka/Redis/DB конекшн чи
+      дочекатись активного HTTP-запиту. Пропустивши їх через ту саму
+      `shutdown()`, що й SIGTERM/SIGINT, отримуємо ті самі кроки зупинки
+      (`server.close`, `producer.disconnect`, `redis.quit`, `db.$client.end()`)
+      замість різкого обриву з'єднань — з тим нюансом, що вихід тепер з
+      кодом 1, а не 0 (сигнал — штатне вимкнення, необроблена помилка — ні).
+      `process.once`, а не `.on`, важливий і тут: якщо сам крок тіардауна
+      кине виняток, це не повинно запустити другий, паралельний тіардаун —
+      10-секундний watchdog усередині `shutdown()` лишається єдиною
+      страховкою на випадок, що крок завис або впав.
 - [ ] **Профілювання** — `--inspect`, heap snapshot, пошук memory leak,
       event loop lag на живому сервісі
 - [ ] **Фінал: підписки + fan-out стрічки** — таблиця follows з лічильниками,
